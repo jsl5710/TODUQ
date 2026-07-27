@@ -1,20 +1,21 @@
 # The chain-of-passes pipeline
 
-Every modified turn is produced by a **4-pass chain**. Each pass is a discrete,
+Every modified turn is produced by a **5-pass chain**. Each pass is a discrete,
 inspectable step, and the whole thing serializes to **one JSON record** in which
 each pass is retrievable by key (`passes.analyse`, `passes.document`,
-`passes.apply`, `passes.confirm`). This separation is deliberate: it keeps the
-*label* (owned by deterministic templates) independent of the *wording* (owned by
-the LLM), with a *judge* guarding the join.
+`passes.apply`, `passes.confirm`, `passes.edit`). This separation is deliberate:
+it keeps the *label* (owned by deterministic templates) independent of the
+*wording* (owned by the LLM), with a *judge* guarding the join and a *finalize*
+step guaranteeing one canonical output.
 
 ```
-                ┌─────────────┐   ┌──────────────┐   ┌────────────┐   ┌─────────────┐
- SGD turn  ───► │ 1. ANALYSE  │──►│ 2. DOCUMENT  │──►│ 3. APPLY   │──►│ 4. CONFIRM  │──► record
- + belief       │ where can   │   │ from → to,   │   │ make the   │   │ did it land?│
-   state        │ type X go?  │   │ slot delta,  │   │ edit +     │   │ judge-gate: │
-                │ target slot │   │ gold action  │   │ paraphrase │   │ accept/     │
-                └─────────────┘   └──────────────┘   └────────────┘   │ review/rej  │
-                                                                       └─────────────┘
+        ┌─────────┐  ┌──────────┐  ┌─────────┐  ┌──────────┐  ┌────────┐
+SGD ──► │1 ANALYSE│─►│2 DOCUMENT│─►│3 APPLY  │─►│4 CONFIRM │─►│5 EDIT  │──► record
+turn +  │ where   │  │ from→to, │  │ make the│  │ did it   │  │ repair │
+belief  │ can X   │  │ slot     │  │ edit +  │  │ land?    │  │ or copy│
+state   │ go?     │  │ delta,   │  │ para-   │  │ judge-   │  │ final  │
+        │ target  │  │ gold     │  │ phrase  │  │ gate     │  │ version│
+        └─────────┘  └──────────┘  └─────────┘  └──────────┘  └────────┘
 ```
 
 ## Pass 1 — Analyse  (`passes.analyse`)
@@ -58,7 +59,25 @@ forms that preserve the Pass-2 meaning). Records `modified_utterance`, `method`,
 Sets `status ∈ {accepted, needs_review, rejected}`. Only `accepted` records enter
 the curated seed set; `needs_review` goes to the human queue.
 
-## Why four passes instead of one prompt
+## Pass 5 — Edit  (`passes.edit`)
+**Input:** the full record after Confirm.
+**Job:** produce the single canonical **final version** of the turn, and fix
+anything Pass 4 flagged as missed. Two modes:
+1. `copy` — Confirm found the change landed cleanly, so the applied output is
+   promoted verbatim as `final_utterance` + `final_belief_state`. (The
+   "copy the final version" case.)
+2. `repair` — a structural check failed (e.g. a slot the spec said to drop is
+   still present). Pass 5 deterministically re-enforces the documented
+   `slot_delta`, re-verifies, and records each fix in `changes`.
+
+Sets `final_status ∈ {finalized, unresolved}`. `unresolved` means deterministic
+repair could not satisfy the documented spec — the record is routed to a human
+regardless of Confirm's verdict. Pass 5 **never** overrides the human-review gate
+in `confirm.status`; it only guarantees a usable final artifact and repairs
+structural defects. Downstream consumers read `passes.edit.final_utterance` as
+the authoritative modified turn.
+
+## Why five passes instead of one prompt
 
 - **Auditability** — each decision is a separate, inspectable key.
 - **Label integrity** — the gold label is set by a rule (Pass 2), not buried in a
@@ -67,6 +86,9 @@ the curated seed set; `needs_review` goes to the human queue.
   fall out of Passes 3–4 for free.
 - **Reproducibility** — re-running with a fixed seed + fixed templates reproduces
   labels exactly; only wording varies.
+- **One canonical output** — Pass 5 guarantees every record ends with exactly one
+  authoritative final version, self-repairing structural defects instead of
+  silently shipping them.
 
 See [`annotation_schema.md`](annotation_schema.md) for the full record and
 [`examples/record_slot_drop.json`](../examples/record_slot_drop.json) for a

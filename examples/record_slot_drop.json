@@ -65,6 +65,20 @@
       },
       "status": "accepted",
       "notes": "Slot city successfully dropped; intent preserved; clarification is the correct resolution."
+    },
+    "edit": {
+      "mode": "copy",
+      "final_utterance": "I would like to find somewhere to eat.",
+      "final_belief_state": {
+        "Restaurants_1": {
+          "active_intent": "FindRestaurants",
+          "requested_slots": [],
+          "slot_values": {}
+        }
+      },
+      "final_status": "finalized",
+      "changes": [],
+      "notes": "Confirmed clean; promoted the applied version as the canonical final."
     }
   },
   "gold": {

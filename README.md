@@ -52,7 +52,7 @@ See [`docs/taxonomy.md`](docs/taxonomy.md) and
 
 ## Chain-of-passes generation
 
-Every modified turn is produced by a deterministic **4-pass LLM chain**, and the
+Every modified turn is produced by a deterministic **5-pass LLM chain**, and the
 result is a single JSON record where **each pass is retrievable by key**:
 
 | Pass         | Key                | Question it answers                                            |
@@ -61,6 +61,11 @@ result is a single JSON record where **each pass is retrievable by key**:
 | 2 · Document | `passes.document`  | *What* changes — `from` → `to`, slot delta, gold action.      |
 | 3 · Apply    | `passes.apply`     | *Make* the edit (template + LLM paraphrase variants).         |
 | 4 · Confirm  | `passes.confirm`   | *Did* the change land? Judge-gate → accept/review/reject.     |
+| 5 · Edit     | `passes.edit`      | *Fix* anything missed, else **copy the confirmed final version**. |
+
+Pass 5 guarantees every record ends with one authoritative `final_utterance` +
+`final_belief_state` to consume — repaired if Pass 4 found a defect, promoted
+as-is otherwise.
 
 The template operator owns the **label**; the LLM owns the **wording**; the judge
 guards the join. See [`docs/pass_chain.md`](docs/pass_chain.md) and the worked

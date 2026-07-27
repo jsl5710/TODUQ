@@ -83,6 +83,18 @@ class ConfirmPass:
 
 
 @dataclass
+class EditPass:
+    """Pass 5 — finalize. Either copies the confirmed output forward as the
+    canonical final version, or repairs a defect Pass 4 flagged."""
+    mode: Literal["copy", "repair"]
+    final_utterance: str
+    final_belief_state: BeliefState = field(default_factory=dict)
+    final_status: Literal["finalized", "unresolved"] = "finalized"
+    changes: list[str] = field(default_factory=list)
+    notes: str = ""
+
+
+@dataclass
 class Gold:
     action: Action
     severity: Severity
@@ -115,6 +127,7 @@ class Record:
     passes_document: DocumentPass
     passes_apply: ApplyPass
     passes_confirm: ConfirmPass
+    passes_edit: EditPass
     gold: Gold
     provenance: Provenance
 
@@ -146,6 +159,14 @@ class Record:
                     "new_belief_state": frames(self.passes_apply.new_belief_state),
                 },
                 "confirm": asdict(self.passes_confirm),
+                "edit": {
+                    "mode": self.passes_edit.mode,
+                    "final_utterance": self.passes_edit.final_utterance,
+                    "final_belief_state": frames(self.passes_edit.final_belief_state),
+                    "final_status": self.passes_edit.final_status,
+                    "changes": self.passes_edit.changes,
+                    "notes": self.passes_edit.notes,
+                },
             },
             "gold": {
                 "action": self.gold.action,

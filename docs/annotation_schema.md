@@ -66,9 +66,21 @@ Each key mirrors one pass (see [`pass_chain.md`](pass_chain.md)).
                                    "uncertainty_present": true,
                                    "naturalness": 0.92 },
                 "status": "accepted",
-                "notes": "" }
+                "notes": "" },
+  "edit":     { "mode": "copy",
+                "final_utterance": "I would like to find somewhere to eat.",
+                "final_belief_state": { "Restaurants_1": { "slot_values": {} } },
+                "final_status": "finalized",
+                "changes": [],
+                "notes": "Confirmed clean; promoted the applied version." }
 }
 ```
+
+`mode`: `copy` (Confirm was clean → promote the applied output) or `repair`
+(a structural check failed → re-enforce the documented `slot_delta`).
+`final_status`: `finalized` or `unresolved` (deterministic repair could not
+satisfy the spec → human). `passes.edit.final_utterance` is the authoritative
+modified turn for downstream consumers.
 
 ## `gold` — flattened for eval
 
@@ -98,3 +110,4 @@ A denormalized copy of the final labels so the eval harness needn't walk
 3. `uncertainty_type == "parameter"` ⇒ `gold.action ∈ {rag_structured, rag_unstructured, hitl}`.
 4. `gold.action == "rag_structured"` ⇒ `passes.document.gold_query != null`.
 5. `passes.confirm.status == "accepted"` ⇒ `change_applied == true`.
+6. `passes.edit.mode == "copy"` ⇒ `passes.confirm.change_applied == true` (else `repair`).

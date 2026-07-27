@@ -14,6 +14,7 @@ from toduq.routing.gold_action import should_abstain
 from toduq.runners.base import LLMClient
 from toduq.schema import (
     ConfirmPass,
+    EditPass,
     Gold,
     Provenance,
     Record,
@@ -68,6 +69,10 @@ def run_chain(
         notes="",
     )
 
+    # Pass 5 — Edit: finalize. Copy the confirmed output forward, or repair a
+    # defect Pass 4 flagged, producing the single canonical final version.
+    edit = _edit(turn, document, apply, confirm)
+
     gold = Gold(
         action=document.gold_action,
         severity=document.expected_severity,
@@ -90,6 +95,7 @@ def run_chain(
         passes_document=document,
         passes_apply=apply,
         passes_confirm=confirm,
+        passes_edit=edit,
         gold=gold,
         provenance=Provenance(
             sgd_version=sgd_version,
@@ -98,6 +104,66 @@ def run_chain(
             judge_model=getattr(judge, "judge_model", None),
         ),
     )
+
+
+def _edit(turn: Turn, document, apply, confirm) -> EditPass:
+    """Pass 5 — finalize / repair.
+
+    - If Pass 4 confirmed the change landed structurally, `copy` the applied
+      output forward as the canonical final version (the "copy the final
+      version" case). The human-review gate in `confirm.status` is untouched.
+    - If a structural check failed (something was missed), `repair`
+      deterministically by re-enforcing the documented `slot_delta`, then
+      re-verify. If it still can't be made consistent, mark `unresolved`.
+    """
+    import copy
+
+    final_state = copy.deepcopy(apply.new_belief_state)
+    final_utterance = apply.modified_utterance
+    changes: list[str] = []
+
+    if confirm.change_applied:
+        mode = "copy"
+    else:
+        mode = "repair"
+        # Re-enforce every documented slot edit that didn't take.
+        for slot, delta in document.slot_delta.items():
+            if delta.get("after") is None:
+                for frame in final_state.values():
+                    if slot in frame.slot_values:
+                        frame.slot_values.pop(slot, None)
+                        changes.append(f"repaired: removed lingering slot '{slot}'")
+            else:
+                for frame in final_state.values():
+                    if frame.slot_values.get(slot) != delta["after"]:
+                        frame.slot_values[slot] = delta["after"]
+                        changes.append(f"repaired: set slot '{slot}' to documented value")
+
+    # Re-verify the final version against the documented spec.
+    repaired_ok = _slot_delta_satisfied(document, final_state)
+    final_status = "finalized" if repaired_ok else "unresolved"
+    notes = "" if repaired_ok else "structural spec unsatisfiable by deterministic repair; route to human."
+
+    return EditPass(
+        mode=mode,
+        final_utterance=final_utterance,
+        final_belief_state=final_state,
+        final_status=final_status,
+        changes=changes,
+        notes=notes,
+    )
+
+
+def _slot_delta_satisfied(document, state) -> bool:
+    for slot, delta in document.slot_delta.items():
+        after = delta.get("after")
+        if after is None:
+            if any(slot in fr.slot_values for fr in state.values()):
+                return False
+        else:
+            if not any(fr.slot_values.get(slot) == after for fr in state.values()):
+                return False
+    return True
 
 
 def _structural_checks(turn: Turn, document, apply) -> dict[str, bool]:

@@ -54,4 +54,9 @@ def check_invariants(record: dict[str, Any]) -> list[str]:
     if confirm["status"] == "accepted" and not confirm["change_applied"]:
         errs.append("accepted status requires change_applied == true")
 
+    # 6. edit.mode == copy requires the change to have landed structurally
+    edit = record["passes"]["edit"]
+    if edit["mode"] == "copy" and not confirm["change_applied"]:
+        errs.append("edit.mode 'copy' requires confirm.change_applied == true (use 'repair')")
+
     return errs

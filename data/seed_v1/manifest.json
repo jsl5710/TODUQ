@@ -1,0 +1,23 @@
+{
+  "sgd_version": "GEM/schema_guided_dialog",
+  "num_dialogues": 1,
+  "policy": "all",
+  "seed": 42,
+  "generator_model": "echo-stub",
+  "judge_model": "heuristic-judge",
+  "stats": {
+    "total": 44,
+    "accepted": 44,
+    "needs_review": 0,
+    "rejected": 0,
+    "invariant_failures": 0,
+    "by_action": {
+      "answer": 6,
+      "clarify": 8,
+      "handoff_llm": 10,
+      "hitl": 6,
+      "rag_structured": 8,
+      "rag_unstructured": 6
+    }
+  }
+}

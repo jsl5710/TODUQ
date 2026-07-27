@@ -40,4 +40,19 @@ def over_abstention_rate(preds: Iterable[bool], gold: Iterable[bool]) -> float:
     return sum(1 for p, _ in pairs if p) / len(pairs)
 
 
-__all__ = ["abstention_accuracy", "routing_accuracy", "over_abstention_rate"]
+from toduq.eval.metrics import (
+    auroc,
+    expected_calibration_error,
+    semantic_entropy,
+    uncertainty_bleed,
+)
+
+__all__ = [
+    "abstention_accuracy",
+    "routing_accuracy",
+    "over_abstention_rate",
+    "expected_calibration_error",
+    "auroc",
+    "semantic_entropy",
+    "uncertainty_bleed",
+]

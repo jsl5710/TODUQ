@@ -39,6 +39,31 @@ class Judge:
         return _parse_verdict(raw)
 
 
+class HeuristicJudge:
+    """Deterministic, offline validation gate — no LLM required.
+
+    It does NOT fabricate an LLM's judgment. It confirms what can be checked by
+    rule: the edit is non-empty and differs from the source (or is a control),
+    the target-slot change is reflected, and length/format look sane. Naturalness
+    is a fixed, clearly-labeled heuristic score. Use it to bootstrap a seed set
+    offline; swap in the LLM `Judge` for higher-fidelity validation.
+    """
+
+    judge_model = "heuristic-judge"
+
+    def validate_injection(self, change_from: str, change_to: str, intended: str,
+                           gold_action: str) -> dict[str, Any]:
+        changed = change_to.strip() and change_to.strip() != change_from.strip()
+        is_control = gold_action == "answer"
+        # control: meaning preserved (we can't verify semantics offline) -> pass
+        # perturbation/injection: require the surface actually changed
+        fidelity = "pass" if (is_control or changed) else "fail"
+        uncertainty_present = (not is_control) and bool(changed)
+        naturalness = 0.7 if change_to.strip() else 0.0  # heuristic, not model-scored
+        return {"fidelity": fidelity, "uncertainty_present": uncertainty_present,
+                "naturalness": naturalness, "_heuristic": True}
+
+
 def _parse_verdict(raw: str) -> dict[str, Any]:
     import json
 

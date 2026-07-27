@@ -53,11 +53,29 @@ def _dialogue() -> int:
     return 0
 
 
+def _generate(use_live: bool) -> int:
+    from toduq.generate import generate_seed
+    llm = judge = None
+    if use_live:
+        from toduq.judge import Judge
+        from toduq.runners.factory import client_for_role
+        gen = client_for_role("generator")
+        llm = gen
+        judge = Judge(client_for_role("judge"))
+    stats = generate_seed(llm=llm, judge=judge)
+    print("Seed set written to data/seed_v1/")
+    print(json.dumps(stats.__dict__, indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="toduq")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("demo", help="run the pass-chain on a fixture and print the record")
     sub.add_parser("dialogue", help="spread injections across a fixture dialogue")
+    gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
+    gen.add_argument("--live", action="store_true",
+                     help="use live generator+judge from configs/models.yaml (needs keys)")
     sub.add_parser("schema", help="print the path to the annotation JSON Schema")
 
     args = parser.parse_args(argv)
@@ -65,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         return _demo()
     if args.cmd == "dialogue":
         return _dialogue()
+    if args.cmd == "generate":
+        return _generate(args.live)
     if args.cmd == "schema":
         from toduq.validate import _SCHEMA_PATH
         print(_SCHEMA_PATH)

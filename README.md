@@ -111,18 +111,24 @@ tests/        schema + operator tests
 
 ## Status
 
-**Milestones 1–3 done.** SGD ingest reconstructs per-turn belief state +
-slot provenance; all eleven v1 operators (Input / Parameter / Reasoning + a
-paraphrase control) are implemented and positionally spread across dialogue
-turns via the 5-pass chain. Next: curated seed set (M4) and the eval harness
-(M5). See [`docs/`](docs/); nothing is frozen yet.
+**Milestones 1–5 done.** SGD ingest reconstructs per-turn belief state + slot
+provenance; all eleven v1 operators are implemented and positionally spread via
+the 5-pass chain; the seed-set generator + judge gate produce a schema-valid seed
+set; and the eval harness scores abstention, routing, calibration (ECE / AUROC),
+and cross-service uncertainty bleed. Provider-agnostic runners (Claude / OpenAI /
+vLLM / Ollama) make the generator, judge, and system-under-test swappable.
 
-Try it offline:
+Try it offline (no API key needed):
 
 ```bash
-PYTHONPATH=src python -m toduq.cli dialogue   # one dialogue -> many samples
-PYTHONPATH=src python -m toduq.cli demo       # one full JSON record
+PYTHONPATH=src python -m toduq.cli dialogue    # one dialogue -> many samples
+PYTHONPATH=src python -m toduq.cli generate    # build data/seed_v1/ (heuristic gate)
+PYTHONPATH=src python -m toduq.cli generate --live   # LLM paraphrase + LLM judge
+PYTHONPATH=src python -m toduq.cli demo        # one full JSON record
 ```
+
+See [`data/seed_v1/`](data/seed_v1/) for the generated seed set and
+[`docs/evaluation.md`](docs/evaluation.md) for the metrics.
 
 ## License & attribution
 

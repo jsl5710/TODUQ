@@ -32,22 +32,24 @@ def _demo() -> int:
 
 
 def _dialogue() -> int:
-    from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS
-    from toduq.operators import get_operator
+    from toduq.ingest import SGD_1_00000_RAW, parse_dialogue
+    from toduq.operators import all_operators
     from toduq.passes import run_dialogue
 
+    d = parse_dialogue(SGD_1_00000_RAW)
     records = run_dialogue(
-        dialogue_id="1_00000",
-        user_turns=RESTAURANT_DIALOGUE_USER_TURNS,
-        operators=[get_operator("slot_drop"), get_operator("paraphrase")],
+        dialogue_id=d.dialogue_id,
+        user_turns=d.user_turns,
+        operators=all_operators(),
+        turn_indices=d.user_turn_indices,
         policy="all",
         seed=1,
     )
     print(f"{len(records)} samples from one dialogue, injected at different turns:")
     for r in sorted(records, key=lambda x: (x.position.user_turn_ordinal, x.operator)):
         p = r.position
-        print(f"  ord {p.user_turn_ordinal} [{p.band:6}] {r.operator:11} "
-              f"action={r.gold.action:9} | {r.passes_edit.final_utterance}")
+        print(f"  t{r.turn_idx} [{p.band:6}] {r.operator:19} "
+              f"action={r.gold.action:16} | {r.passes_edit.final_utterance}")
     return 0
 
 

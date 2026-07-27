@@ -111,8 +111,18 @@ tests/        schema + operator tests
 
 ## Status
 
-Scaffold / design phase. See [`docs/`](docs/) for the design; nothing here is
-frozen yet.
+**Milestones 1–3 done.** SGD ingest reconstructs per-turn belief state +
+slot provenance; all eleven v1 operators (Input / Parameter / Reasoning + a
+paraphrase control) are implemented and positionally spread across dialogue
+turns via the 5-pass chain. Next: curated seed set (M4) and the eval harness
+(M5). See [`docs/`](docs/); nothing is frozen yet.
+
+Try it offline:
+
+```bash
+PYTHONPATH=src python -m toduq.cli dialogue   # one dialogue -> many samples
+PYTHONPATH=src python -m toduq.cli demo       # one full JSON record
+```
 
 ## License & attribution
 

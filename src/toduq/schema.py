@@ -32,6 +32,13 @@ BeliefState = dict[str, Frame]
 class Turn:
     utterance: str
     belief_state: BeliefState = field(default_factory=dict)
+    # Per-turn slot provenance (populated by the SGD ingest):
+    #   verbalized_slots: service -> [slots whose value is SPOKEN in this utterance]
+    #                     (from SGD frame `slots` spans — the ground truth for
+    #                     "what this turn actually says", used by operators).
+    #   introduced_slots: service -> [slots NEW/changed vs. the previous user turn]
+    verbalized_slots: dict[str, list[str]] = field(default_factory=dict)
+    introduced_slots: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass

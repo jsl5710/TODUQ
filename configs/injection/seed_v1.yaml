@@ -7,16 +7,19 @@ sgd:
   # curated seed: hand-picked dialogues spanning single- + multi-domain
   dialogue_allowlist: [] # empty = sample; fill with ids for the curated seed
 
-operators:                # v1 scope: input, parameter, reasoning
+operators:                # v1 scope: input, parameter, reasoning (all implemented)
   enabled:
     - slot_drop           # input        -> clarify
-    - referential_ambig   # input        -> clarify         (planned)
-    - multi_value         # input        -> clarify         (planned)
-    - out_of_kb_entity    # parameter    -> rag_structured  (planned)
-    - out_of_schema_req   # parameter    -> rag_unstructured(planned)
-    - unknowable_fact     # parameter    -> hitl            (planned)
-    - cross_turn_contra   # reasoning    -> handoff_llm     (planned)
-    - cross_service_dep   # reasoning    -> handoff_llm     (planned)
+    - referential_ambig   # input        -> clarify
+    - multi_value         # input        -> clarify
+    - underspecify        # input        -> clarify
+    - out_of_kb_entity    # parameter    -> rag_structured
+    - out_of_schema_req   # parameter    -> rag_unstructured
+    - long_tail_entity    # parameter    -> rag_structured
+    - unknowable_fact     # parameter    -> hitl (major)
+    - cross_turn_contra   # reasoning    -> handoff_llm
+    - implicit_constraint # reasoning    -> handoff_llm
+    - cross_service_dep   # reasoning    -> handoff_llm (multi-domain only)
     - paraphrase          # control      -> answer
 
 balance:

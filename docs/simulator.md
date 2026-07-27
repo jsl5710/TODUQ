@@ -39,10 +39,23 @@ TODUQ sample (Record) ─► reconstruct perturbed dialogue ─► replay turn-b
 - For a **control** (`paraphrase`, `should_abstain == False`): **no** turn spikes
   — a good metric must not raise a false alarm on a meaning-preserving paraphrase.
 
+## Two modes & metric choice
+
+- `--mode history` (default) — each turn is scored with the **prior conversation
+  history** (if any).
+- `--mode immediate` — each turn is scored **in isolation** (current turn only).
+- `--metric` — any method from the shared UQ registry (`lexical`,
+  `semantic_entropy`, `self_consistency`, `verbalized_confidence`).
+
+Input-based metrics (`lexical`) are mode-invariant; response-based ones
+(`semantic_entropy`, `verbalized_confidence`) prompt the bot with vs without the
+history, so mode changes their score (needs a live model to observe).
+
 ## Run it
 
 ```bash
-PYTHONPATH=src python -m toduq.cli simulate
+PYTHONPATH=src python -m toduq.cli simulate --metric lexical --mode history
+PYTHONPATH=src python -m toduq.cli simulate --metric semantic_entropy --mode immediate
 ```
 
 Offline output (lexical metric):

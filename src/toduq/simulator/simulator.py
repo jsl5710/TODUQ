@@ -37,6 +37,7 @@ class SimResult:
     predicted_ordinal: Optional[int] = None
     rank_of_injected: Optional[int] = None
     identified: bool = False           # metric peaked at the injected turn (and it should)
+    mode: str = "history"              # "immediate" (turn alone) | "history" (turn + prior context)
 
 
 def perturbed_user_turns(original: list[Turn], record) -> list[Turn]:
@@ -52,7 +53,16 @@ def perturbed_user_turns(original: list[Turn], record) -> list[Turn]:
 
 
 def simulate_record(record, original_user_turns: list[Turn], bot: Chatbot,
-                    metric: UQMetric) -> SimResult:
+                    metric: UQMetric, *, mode: str = "history") -> SimResult:
+    """Replay a sample and score each turn's uncertainty.
+
+    mode:
+      - "history"   : the metric sees the turn PLUS the prior conversation history
+                      (the accumulated context, if any).
+      - "immediate" : the metric sees only the current turn, in isolation.
+    """
+    if mode not in ("history", "immediate"):
+        raise ValueError(f"mode must be 'history' or 'immediate', got {mode!r}")
     turns = perturbed_user_turns(original_user_turns, record)
     injected = record.position.user_turn_ordinal
     should_abstain = record.gold.should_abstain
@@ -60,9 +70,10 @@ def simulate_record(record, original_user_turns: list[Turn], bot: Chatbot,
     history: list[str] = []
     scores: list[TurnScore] = []
     for i, t in enumerate(turns):
-        s = metric.score(bot, t.utterance, history)
+        context = history if mode == "history" else []
+        s = metric.score(bot, t.utterance, context)
         scores.append(TurnScore(i, t.utterance, round(s, 4), i == injected))
-        # advance the dialogue: the bot responds, both turns join the history
+        # advance the dialogue regardless, so history mode has context to use
         resp = bot.respond(t.utterance, history)
         history += [f"User: {t.utterance}", f"Assistant: {resp}"]
 
@@ -79,4 +90,4 @@ def simulate_record(record, original_user_turns: list[Turn], bot: Chatbot,
     return SimResult(metric=metric.name, operator=record.operator,
                      injected_ordinal=injected, should_abstain=should_abstain,
                      turn_scores=scores, predicted_ordinal=predicted,
-                     rank_of_injected=rank, identified=identified)
+                     rank_of_injected=rank, identified=identified, mode=mode)

@@ -54,3 +54,31 @@ def test_scores_are_per_turn_and_bounded():
     res = simulate_record(rec, TURNS, Chatbot(), LexicalUncertaintyMetric())
     assert len(res.turn_scores) == len(TURNS)
     assert all(0.0 <= ts.score <= 1.0 for ts in res.turn_scores)
+
+
+def test_mode_recorded_and_intrinsic_metric_is_mode_invariant():
+    rec = _record("slot_drop")
+    hist = simulate_record(rec, TURNS, Chatbot(), LexicalUncertaintyMetric(), mode="history")
+    imm = simulate_record(rec, TURNS, Chatbot(), LexicalUncertaintyMetric(), mode="immediate")
+    assert hist.mode == "history" and imm.mode == "immediate"
+    # lexical is intrinsic (ignores context) -> same scores in both modes
+    assert [t.score for t in hist.turn_scores] == [t.score for t in imm.turn_scores]
+
+
+def test_mode_changes_context_for_context_aware_metric():
+    # a context-aware metric: high uncertainty only when history is present
+    from toduq.simulator.metrics import _MetricAdapter
+
+    class _CtxMethod:
+        name = "ctx"
+        def score(self, text, *, context=(), client=None):
+            from toduq.uq import UQScore
+            return UQScore(1.0 if context else 0.0, self.name)
+
+    metric = _MetricAdapter(_CtxMethod())
+    rec = _record("slot_drop")  # injected at ordinal 1, so later turns have history
+    hist = simulate_record(rec, TURNS, Chatbot(), metric, mode="history")
+    imm = simulate_record(rec, TURNS, Chatbot(), metric, mode="immediate")
+    assert imm.turn_scores[-1].score == 0.0          # no context -> 0
+    assert hist.turn_scores[-1].score == 1.0          # has history -> 1
+    assert hist.turn_scores[0].score == 0.0           # first turn: no prior history either way

@@ -68,7 +68,7 @@ def _generate(use_live: bool) -> int:
     return 0
 
 
-def _simulate(metric_name: str = "lexical") -> int:
+def _simulate(metric_name: str = "lexical", mode: str = "history") -> int:
     from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS, SGD_1_00000_RAW, parse_dialogue
     from toduq.operators import all_operators
     from toduq.passes import run_dialogue
@@ -85,14 +85,14 @@ def _simulate(metric_name: str = "lexical") -> int:
     for r in records:
         first.setdefault(r.operator, r)
 
-    print(f"TODUQ Simulator — chatbot replay, UQ metric = {metric.name}\n")
+    print(f"TODUQ Simulator — chatbot replay, UQ metric = {metric.name}, mode = {mode}\n")
     hits = total = 0
     for op_id in ("slot_drop", "underspecify", "multi_value", "referential_ambig",
                   "out_of_kb_entity", "cross_turn_contra", "paraphrase"):
         rec = first.get(op_id)
         if rec is None:
             continue
-        res = simulate_record(rec, RESTAURANT_DIALOGUE_USER_TURNS, bot, metric)
+        res = simulate_record(rec, RESTAURANT_DIALOGUE_USER_TURNS, bot, metric, mode=mode)
         total += 1
         hits += res.identified
         peak = ", ".join(f"t{ts.ordinal}={ts.score}" for ts in res.turn_scores if ts.score > 0) or "(no spike)"
@@ -114,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
     sim = sub.add_parser("simulate", help="replay a sample turn-by-turn; test if a UQ metric localizes the injection")
     sim.add_argument("--metric", default="lexical",
                      help="UQ method from the shared registry (lexical | semantic_entropy | self_consistency | verbalized_confidence)")
+    sim.add_argument("--mode", default="history", choices=["history", "immediate"],
+                     help="history = turn + prior context; immediate = current turn alone")
     gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
     gen.add_argument("--live", action="store_true",
                      help="use live generator+judge from configs/models.yaml (needs keys)")
@@ -125,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "dialogue":
         return _dialogue()
     if args.cmd == "simulate":
-        return _simulate(args.metric)
+        return _simulate(args.metric, args.mode)
     if args.cmd == "generate":
         return _generate(args.live)
     if args.cmd == "schema":

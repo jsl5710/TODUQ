@@ -23,6 +23,12 @@ balance:
   # target share of meaning-preserving controls in the seed set
   control_fraction: 0.25
 
+positioning:
+  # spread injections across dialogue positions instead of a fixed turn
+  policy: stratified_position   # all | one_per_turn | stratified_position | n_per_dialogue
+  k: null                       # cap on sites per dialogue (null = policy default)
+  seed: 42
+
 generation:
   seed: 42
   paraphrase_variants: 2

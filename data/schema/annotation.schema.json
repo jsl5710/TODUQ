@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["record_id", "dialogue_id", "turn_idx", "services", "family",
                "operator", "uncertainty_type", "uncertainty_source",
-               "source", "passes", "gold", "provenance"],
+               "position", "source", "passes", "gold", "provenance"],
   "additionalProperties": false,
   "properties": {
     "record_id": { "type": "string" },
@@ -17,6 +17,18 @@
     "operator": { "type": "string" },
     "uncertainty_type": { "enum": ["input", "reasoning", "parameter", "prediction"] },
     "uncertainty_source": { "enum": ["aleatoric", "epistemic", "mixed"] },
+
+    "position": {
+      "type": "object",
+      "required": ["user_turn_ordinal", "num_user_turns", "relative_position", "band"],
+      "additionalProperties": false,
+      "properties": {
+        "user_turn_ordinal": { "type": "integer", "minimum": 0 },
+        "num_user_turns": { "type": "integer", "minimum": 1 },
+        "relative_position": { "type": "number", "minimum": 0, "maximum": 1 },
+        "band": { "enum": ["early", "middle", "late"] }
+      }
+    },
 
     "source": {
       "type": "object",

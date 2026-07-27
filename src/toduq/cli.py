@@ -1,7 +1,8 @@
 """Minimal CLI. Real subcommands (ingest, generate, eval) land per milestone.
 
-    toduq demo     # run the chain on a built-in fixture, print the JSON record
-    toduq schema   # print the annotation JSON Schema path
+    toduq demo      # run the chain on a built-in fixture, print the JSON record
+    toduq dialogue  # spread injections across a fixture dialogue's user turns
+    toduq schema    # print the annotation JSON Schema path
 """
 from __future__ import annotations
 
@@ -30,15 +31,38 @@ def _demo() -> int:
     return 0
 
 
+def _dialogue() -> int:
+    from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS
+    from toduq.operators import get_operator
+    from toduq.passes import run_dialogue
+
+    records = run_dialogue(
+        dialogue_id="1_00000",
+        user_turns=RESTAURANT_DIALOGUE_USER_TURNS,
+        operators=[get_operator("slot_drop"), get_operator("paraphrase")],
+        policy="all",
+        seed=1,
+    )
+    print(f"{len(records)} samples from one dialogue, injected at different turns:")
+    for r in sorted(records, key=lambda x: (x.position.user_turn_ordinal, x.operator)):
+        p = r.position
+        print(f"  ord {p.user_turn_ordinal} [{p.band:6}] {r.operator:11} "
+              f"action={r.gold.action:9} | {r.passes_edit.final_utterance}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="toduq")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("demo", help="run the pass-chain on a fixture and print the record")
+    sub.add_parser("dialogue", help="spread injections across a fixture dialogue")
     sub.add_parser("schema", help="print the path to the annotation JSON Schema")
 
     args = parser.parse_args(argv)
     if args.cmd == "demo":
         return _demo()
+    if args.cmd == "dialogue":
+        return _dialogue()
     if args.cmd == "schema":
         from toduq.validate import _SCHEMA_PATH
         print(_SCHEMA_PATH)

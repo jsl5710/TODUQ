@@ -7,6 +7,12 @@
   "operator": "slot_drop",
   "uncertainty_type": "input",
   "uncertainty_source": "aleatoric",
+  "position": {
+    "user_turn_ordinal": 1,
+    "num_user_turns": 6,
+    "relative_position": 0.2,
+    "band": "early"
+  },
   "source": {
     "utterance": "I would like for it to be in San Jose.",
     "belief_state": {

@@ -47,6 +47,26 @@ RESTAURANT_TURN_CITY = Turn(
     },
 )
 
+# Full single-domain dialogue (SGD 1_00000), user turns in order with the belief
+# state accumulated after each — used to demo/test positional site selection.
+RESTAURANT_DIALOGUE_USER_TURNS = [
+    Turn("I am feeling hungry so I would like to find a place to eat.",
+         {"Restaurants_1": Frame("FindRestaurants", [], {})}),
+    Turn("I would like for it to be in San Jose.",
+         {"Restaurants_1": Frame("FindRestaurants", [], {"city": "San Jose"})}),
+    Turn("I usually like eating the American type of food.",
+         {"Restaurants_1": Frame("FindRestaurants", [], {"city": "San Jose", "cuisine": "American"})}),
+    Turn("Can you give me the address of this restaurant.",
+         {"Restaurants_1": Frame("FindRestaurants", ["street_address"],
+                                 {"city": "San Jose", "cuisine": "American"})}),
+    Turn("Can you give me the phone number that I can contact them with?",
+         {"Restaurants_1": Frame("FindRestaurants", ["phone_number"],
+                                 {"city": "San Jose", "cuisine": "American"})}),
+    Turn("Is there some other restaurant which you can suggest?",
+         {"Restaurants_1": Frame("FindRestaurants", [],
+                                 {"city": "San Jose", "cuisine": "American"})}),
+]
+
 MUSIC_EVENTS_SWITCH_TURN = Turn(
     utterance="Thanks! I really like music events. I enjoy rock and want to see something on March 7th.",
     belief_state={

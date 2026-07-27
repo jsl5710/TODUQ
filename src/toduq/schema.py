@@ -35,6 +35,15 @@ class Turn:
 
 
 @dataclass
+class Position:
+    """Where in the dialogue the injected turn sits, among all user turns."""
+    user_turn_ordinal: int              # 0-based index among USER turns
+    num_user_turns: int
+    relative_position: float            # ordinal / (num_user_turns - 1), in [0, 1]
+    band: Literal["early", "middle", "late"] = "early"
+
+
+@dataclass
 class GoldQuery:
     service: str
     intent: str
@@ -122,6 +131,7 @@ class Record:
     operator: str
     uncertainty_type: UncertaintyType
     uncertainty_source: UncertaintySource
+    position: Position
     source: Turn
     passes_analyse: AnalysePass
     passes_document: DocumentPass
@@ -145,6 +155,7 @@ class Record:
             "operator": self.operator,
             "uncertainty_type": self.uncertainty_type,
             "uncertainty_source": self.uncertainty_source,
+            "position": asdict(self.position),
             "source": {
                 "utterance": self.source.utterance,
                 "belief_state": frames(self.source.belief_state),

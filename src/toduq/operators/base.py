@@ -55,3 +55,17 @@ class Operator(ABC):
             for slot, value in frame.slot_values.items():
                 return service, slot, value
         return None
+
+    @staticmethod
+    def _verbalized_slot(turn: Turn) -> Optional[tuple[str, str, object]]:
+        """Return (service, slot, value) for a slot whose value is actually spoken
+        in THIS turn's utterance — the slot this turn introduces/mentions, not one
+        carried over from an earlier turn. Prefers a verbalized slot; falls back to
+        None so operators can decline turns that only reference prior state.
+        """
+        utt = turn.utterance.lower()
+        for service, frame in turn.belief_state.items():
+            for slot, value in frame.slot_values.items():
+                if value is not None and str(value).lower() in utt:
+                    return service, slot, value
+        return None

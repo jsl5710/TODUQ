@@ -43,6 +43,17 @@ Prediction (sampling-variance) is measured, not injected, and lands in v2.
 See [`docs/taxonomy.md`](docs/taxonomy.md) and
 [`docs/injection_operators.md`](docs/injection_operators.md).
 
+## Positioning — spread across the dialogue
+
+Uncertainty is **not** fixed to one turn. A dialogue has many user turns; each
+sample injects at a **different** turn, so the dataset spreads perturbations over
+early / middle / late positions. One dialogue therefore yields several samples,
+each carrying a `position` (`user_turn_ordinal`, `band`, `relative_position`).
+This supports depth-sensitivity and position-invariance experiments, and — for
+multi-domain dialogues — injecting near vs. far from the service switch. Site
+selection is applicability-aware (an operator only fires where it's valid) and
+positionally stratified. See [`docs/positioning.md`](docs/positioning.md).
+
 ## Manipulation families
 
 - **Paraphrase** — meaning- and belief-state-preserving. A *control*: gold

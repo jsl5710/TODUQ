@@ -20,10 +20,13 @@ class SlotDrop(Operator):
     uncertainty_type = "input"
 
     def is_applicable(self, turn: Turn) -> bool:
-        return self._first_filled_slot(turn) is not None
+        # Only fire where this turn actually verbalizes a slot value; a turn that
+        # merely requests info (requested_slots) or references carried-over state
+        # is not a valid slot-drop site.
+        return self._verbalized_slot(turn) is not None
 
     def analyse(self, turn: Turn) -> AnalysePass:
-        hit = self._first_filled_slot(turn)
+        hit = self._verbalized_slot(turn)
         if hit is None:
             return AnalysePass(modifiable=False, rationale="No filled slot to drop.")
         service, slot, value = hit

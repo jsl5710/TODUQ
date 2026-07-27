@@ -16,6 +16,7 @@ from toduq.schema import (
     ConfirmPass,
     EditPass,
     Gold,
+    Position,
     Provenance,
     Record,
     Turn,
@@ -35,13 +36,22 @@ def run_chain(
     turn_idx: int,
     turn: Turn,
     operator: Operator,
+    position: Optional[Position] = None,
     llm: Optional[LLMClient] = None,
     judge: Optional[Judge | NullJudge] = None,
     seed: int = 0,
     sgd_version: str = "GEM/schema_guided_dialog",
 ) -> Optional[Record]:
-    """Run all four passes. Returns None if the turn is not a viable site."""
+    """Run all five passes on ONE site. Returns None if the turn is not viable.
+
+    `position` locates this turn among the dialogue's user turns; when omitted
+    (single-turn use) it defaults to a lone early turn. Use `run_dialogue` to
+    spread injections across positions within a dialogue.
+    """
     judge = judge or NullJudge()
+    if position is None:
+        position = Position(user_turn_ordinal=0, num_user_turns=1,
+                            relative_position=0.0, band="early")
 
     # Pass 1 — Analyse
     analysis = operator.analyse(turn)
@@ -90,6 +100,7 @@ def run_chain(
         operator=operator.id,
         uncertainty_type=document.intended_uncertainty,
         uncertainty_source=UNCERTAINTY_SOURCE[document.intended_uncertainty],
+        position=position,
         source=turn,
         passes_analyse=analysis,
         passes_document=document,
@@ -104,6 +115,51 @@ def run_chain(
             judge_model=getattr(judge, "judge_model", None),
         ),
     )
+
+
+def run_dialogue(
+    *,
+    dialogue_id: str,
+    user_turns: list[Turn],
+    operators: list[Operator],
+    policy: str = "stratified_position",
+    k: Optional[int] = None,
+    turn_indices: Optional[list[int]] = None,
+    llm: Optional[LLMClient] = None,
+    judge: Optional[Judge | NullJudge] = None,
+    seed: int = 0,
+    sgd_version: str = "GEM/schema_guided_dialog",
+) -> list[Record]:
+    """Generate multiple samples from ONE dialogue, each injecting uncertainty at
+    a DIFFERENT user turn.
+
+    Enumerates every applicable (turn, operator) site, selects a positionally
+    balanced subset (see toduq.positioning), and runs the 5-pass chain on each.
+    Returns one Record per selected site, so a single dialogue yields samples
+    spread across early / middle / late turns.
+    """
+    # Imported here to avoid a circular import (positioning imports schema only).
+    from toduq.positioning import enumerate_sites, select_sites
+
+    sites = enumerate_sites(user_turns, operators, turn_indices=turn_indices)
+    chosen = select_sites(sites, policy=policy, k=k, seed=seed)
+
+    records: list[Record] = []
+    for site in chosen:
+        rec = run_chain(
+            dialogue_id=dialogue_id,
+            turn_idx=site.turn_idx,
+            turn=user_turns[site.ordinal],
+            operator=site.operator,
+            position=site.position,
+            llm=llm,
+            judge=judge,
+            seed=seed,
+            sgd_version=sgd_version,
+        )
+        if rec is not None:
+            records.append(rec)
+    return records
 
 
 def _edit(turn: Turn, document, apply, confirm) -> EditPass:

@@ -1,0 +1,27 @@
+# Model registry. Copy to models.yaml and fill in. NEVER commit real keys —
+# reference environment variables only (see .gitignore; keys live in .env).
+
+closed:
+  claude:
+    adapter: toduq.runners.claude:ClaudeClient
+    model_id: claude-sonnet-5           # default generator/judge; swap as needed
+    api_key_env: ANTHROPIC_API_KEY
+  openai:
+    adapter: toduq.runners.openai:OpenAIClient
+    model_id: gpt-4o
+    api_key_env: OPENAI_API_KEY
+
+open:
+  vllm_local:
+    adapter: toduq.runners.open_source:VLLMClient
+    model_id: meta-llama/Llama-3.1-8B-Instruct
+    endpoint: http://localhost:8000/v1
+  ollama:
+    adapter: toduq.runners.open_source:OllamaClient
+    model_id: llama3.1
+    endpoint: http://localhost:11434
+
+roles:
+  generator: claude        # produces paraphrase variants (Pass 3)
+  judge: claude            # validates injections (Pass 4) + scores responses
+  system_under_test: open  # the model whose abstention/routing we measure

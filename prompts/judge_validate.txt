@@ -1,0 +1,23 @@
+You are an LLM judge validating a modified task-oriented-dialogue turn for a
+uncertainty-quantification dataset. Judge only what is asked. Be strict: when in
+doubt, do not pass.
+
+ORIGINAL turn:
+{{change_from}}
+
+MODIFIED turn:
+{{change_to}}
+
+The modification was intended to introduce "{{intended_uncertainty}}" uncertainty,
+and the gold routing action for a good dialogue agent is "{{gold_action}}".
+
+Assess three things:
+1. fidelity — does the modified turn match the documented intent WITHOUT
+   introducing unintended changes? ("pass" | "fail" | "uncertain")
+2. uncertainty_present — is the intended uncertainty actually present in the
+   modified turn? (true | false)
+3. naturalness — does the modified turn read like fluent, natural user speech?
+   (0.0 - 1.0)
+
+Respond with ONLY a JSON object, no prose:
+{"fidelity": "...", "uncertainty_present": true, "naturalness": 0.0}

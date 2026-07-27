@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jsl5710/TODUQ/data/schema/annotation.schema.json",
+  "title": "TODUQ annotation record",
+  "description": "One SGD user turn with injected uncertainty and its chain-of-passes provenance.",
+  "type": "object",
+  "required": ["record_id", "dialogue_id", "turn_idx", "services", "family",
+               "operator", "uncertainty_type", "uncertainty_source",
+               "source", "passes", "gold", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "record_id": { "type": "string" },
+    "dialogue_id": { "type": "string" },
+    "turn_idx": { "type": "integer", "minimum": 0 },
+    "services": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "family": { "enum": ["paraphrase", "perturbation", "injection"] },
+    "operator": { "type": "string" },
+    "uncertainty_type": { "enum": ["input", "reasoning", "parameter", "prediction"] },
+    "uncertainty_source": { "enum": ["aleatoric", "epistemic", "mixed"] },
+
+    "source": {
+      "type": "object",
+      "required": ["utterance", "belief_state"],
+      "additionalProperties": false,
+      "properties": {
+        "utterance": { "type": "string" },
+        "belief_state": { "$ref": "#/$defs/beliefState" }
+      }
+    },
+
+    "passes": {
+      "type": "object",
+      "required": ["analyse", "document", "apply", "confirm"],
+      "additionalProperties": false,
+      "properties": {
+        "analyse": {
+          "type": "object",
+          "required": ["modifiable"],
+          "properties": {
+            "modifiable": { "type": "boolean" },
+            "target_service": { "type": ["string", "null"] },
+            "target_slot": { "type": ["string", "null"] },
+            "target_intent": { "type": ["string", "null"] },
+            "candidate_operators": { "type": "array", "items": { "type": "string" } },
+            "rationale": { "type": "string" }
+          }
+        },
+        "document": {
+          "type": "object",
+          "required": ["operator", "change_from", "change_to", "slot_delta",
+                       "intended_uncertainty", "expected_severity", "gold_action"],
+          "properties": {
+            "operator": { "type": "string" },
+            "change_from": { "type": "string" },
+            "change_to": { "type": "string" },
+            "slot_delta": { "$ref": "#/$defs/slotDelta" },
+            "intended_uncertainty": { "enum": ["input", "reasoning", "parameter", "prediction"] },
+            "expected_severity": { "enum": ["none", "minor", "major"] },
+            "gold_action": { "$ref": "#/$defs/action" },
+            "gold_clarification_question": { "type": ["string", "null"] },
+            "gold_query": { "$ref": "#/$defs/goldQuery" }
+          }
+        },
+        "apply": {
+          "type": "object",
+          "required": ["modified_utterance", "method"],
+          "properties": {
+            "modified_utterance": { "type": "string" },
+            "method": { "type": "string" },
+            "paraphrase_variants": { "type": "array", "items": { "type": "string" } },
+            "new_belief_state": { "$ref": "#/$defs/beliefState" }
+          }
+        },
+        "confirm": {
+          "type": "object",
+          "required": ["change_applied", "status"],
+          "properties": {
+            "change_applied": { "type": "boolean" },
+            "structural_checks": { "type": "object" },
+            "judge_verdict": {
+              "type": "object",
+              "properties": {
+                "fidelity": { "enum": ["pass", "fail", "uncertain"] },
+                "uncertainty_present": { "type": "boolean" },
+                "naturalness": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "status": { "enum": ["accepted", "needs_review", "rejected"] },
+            "notes": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "gold": {
+      "type": "object",
+      "required": ["action", "severity", "should_abstain"],
+      "properties": {
+        "action": { "$ref": "#/$defs/action" },
+        "severity": { "enum": ["none", "minor", "major"] },
+        "clarification_question": { "type": ["string", "null"] },
+        "query": { "$ref": "#/$defs/goldQuery" },
+        "should_abstain": { "type": "boolean" }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "required": ["sgd_version", "seed"],
+      "properties": {
+        "sgd_version": { "type": "string" },
+        "seed": { "type": "integer" },
+        "generator_model": { "type": ["string", "null"] },
+        "judge_model": { "type": ["string", "null"] },
+        "created_at": { "type": ["string", "null"] }
+      }
+    }
+  },
+
+  "$defs": {
+    "action": { "enum": ["answer", "clarify", "rag_structured",
+                          "rag_unstructured", "handoff_llm", "hitl"] },
+    "beliefState": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "active_intent": { "type": ["string", "null"] },
+          "requested_slots": { "type": "array", "items": { "type": "string" } },
+          "slot_values": { "type": "object" }
+        }
+      }
+    },
+    "slotDelta": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["before", "after"],
+        "properties": { "before": {}, "after": {} }
+      }
+    },
+    "goldQuery": {
+      "type": ["object", "null"],
+      "properties": {
+        "service": { "type": "string" },
+        "intent": { "type": "string" },
+        "constraints": { "type": "object" },
+        "retrieval_kind": { "enum": ["structured", "unstructured"] }
+      }
+    }
+  }
+}

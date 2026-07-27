@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toduq"
+version = "0.1.0"
+description = "Task-Oriented Dialogue Uncertainty Quantification — controlled uncertainty injection over SGD with a chain-of-passes pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT (code) / CC BY-SA 4.0 (data)" }
+authors = [{ name = "TODUQ contributors" }]
+keywords = ["uncertainty-quantification", "task-oriented-dialogue", "abstention", "llm", "sgd"]
+
+dependencies = [
+    "datasets>=2.18",       # pull SGD from the HF hub
+    "pydantic>=2.6",        # record schema + validation
+    "jsonschema>=4.21",     # validate against data/schema/annotation.schema.json
+    "pyyaml>=6.0",          # configs
+    "tenacity>=8.2",        # retry LLM calls
+]
+
+[project.optional-dependencies]
+closed = ["anthropic>=0.40", "openai>=1.30"]
+open = ["vllm>=0.5; platform_system == 'Linux'", "transformers>=4.40", "torch>=2.2"]
+eval = ["numpy>=1.26", "scikit-learn>=1.4"]  # ECE, AUROC, semantic entropy
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
+
+[project.scripts]
+toduq = "toduq.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

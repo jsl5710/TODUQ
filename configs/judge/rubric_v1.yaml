@@ -1,0 +1,26 @@
+# LLM-as-judge rubric (v1). Two jobs: validate injections, score responses.
+
+validate_injection:
+  prompt: prompts/judge_validate.txt
+  criteria:
+    fidelity:            # does the edit match documented intent, no side effects
+      values: [pass, fail, uncertain]
+    uncertainty_present: # is the intended uncertainty actually there
+      type: bool
+    naturalness:         # fluent natural user speech
+      range: [0.0, 1.0]
+  decision:
+    accept_if: "fidelity == 'pass' and uncertainty_present and naturalness >= 0.6"
+    reject_if: "fidelity == 'fail'"
+    else: needs_review
+
+score_response:          # used by the eval harness on the system-under-test
+  criteria:
+    abstained_correctly:  # abstain iff gold.should_abstain
+      type: bool
+    routed_correctly:     # predicted action == gold.action
+      type: bool
+    clarification_quality:# only when gold.action == clarify
+      range: [0.0, 1.0]
+  panel:
+    n_judges: 1           # raise to 3 for adversarial majority-vote validation

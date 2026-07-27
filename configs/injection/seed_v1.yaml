@@ -1,0 +1,43 @@
+# Seed-set generation config (v1).
+# Controls which operators run, the control:perturbation balance, and gating.
+
+sgd:
+  version: GEM/schema_guided_dialog
+  split: validation
+  # curated seed: hand-picked dialogues spanning single- + multi-domain
+  dialogue_allowlist: [] # empty = sample; fill with ids for the curated seed
+
+operators:                # v1 scope: input, parameter, reasoning (all implemented)
+  enabled:
+    - slot_drop           # input        -> clarify
+    - referential_ambig   # input        -> clarify
+    - multi_value         # input        -> clarify
+    - underspecify        # input        -> clarify
+    - out_of_kb_entity    # parameter    -> rag_structured
+    - out_of_schema_req   # parameter    -> rag_unstructured
+    - long_tail_entity    # parameter    -> rag_structured
+    - unknowable_fact     # parameter    -> hitl (major)
+    - cross_turn_contra   # reasoning    -> handoff_llm
+    - implicit_constraint # reasoning    -> handoff_llm
+    - cross_service_dep   # reasoning    -> handoff_llm (multi-domain only)
+    - paraphrase          # control      -> answer
+
+balance:
+  # target share of meaning-preserving controls in the seed set
+  control_fraction: 0.25
+
+positioning:
+  # spread injections across dialogue positions instead of a fixed turn
+  policy: stratified_position   # all | one_per_turn | stratified_position | n_per_dialogue
+  k: null                       # cap on sites per dialogue (null = policy default)
+  seed: 42
+
+generation:
+  seed: 42
+  paraphrase_variants: 2
+
+gating:
+  # only these statuses enter the curated seed set automatically
+  auto_accept_statuses: [accepted]
+  human_review_statuses: [needs_review]
+  min_naturalness: 0.6

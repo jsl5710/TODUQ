@@ -1,0 +1,100 @@
+"""Seed-set generation (Milestone 4).
+
+Runs the chain-of-passes over selected dialogues with a generator LLM (Pass-3
+paraphrase) and a judge (Pass-4 validation), then partitions the output:
+  - accepted   -> seed records (data/seed_v1/records.jsonl)
+  - needs_review / rejected -> human queue (data/seed_v1/review_queue.jsonl)
+plus a manifest with counts and provenance.
+
+Runs fully offline with EchoClient + HeuristicJudge; pass live clients (via the
+model factory) to regenerate with LLM paraphrase + LLM judge.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
+
+from toduq.ingest import SGD_1_00000_RAW, parse_dialogue
+from toduq.judge import HeuristicJudge, Judge, NullJudge
+from toduq.operators import all_operators
+from toduq.passes import run_dialogue
+from toduq.runners.base import LLMClient
+from toduq.validate import check_invariants
+
+_OUT = Path(__file__).resolve().parents[2] / "data" / "seed_v1"
+
+
+@dataclass
+class SeedStats:
+    total: int
+    accepted: int
+    needs_review: int
+    rejected: int
+    invariant_failures: int
+    by_action: dict[str, int]
+
+
+def generate_seed(
+    raw_dialogues: Optional[list[dict[str, Any]]] = None,
+    *,
+    llm: Optional[LLMClient] = None,
+    judge: Optional[Judge | NullJudge | HeuristicJudge] = None,
+    policy: str = "all",
+    seed: int = 42,
+    out_dir: Path = _OUT,
+) -> SeedStats:
+    raw_dialogues = raw_dialogues or [SGD_1_00000_RAW]
+    judge = judge or HeuristicJudge()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    accepted, review = [], []
+    by_action: dict[str, int] = {}
+    inv_fail = 0
+
+    for raw in raw_dialogues:
+        d = parse_dialogue(raw)
+        records = run_dialogue(
+            dialogue_id=d.dialogue_id, user_turns=d.user_turns,
+            operators=all_operators(), turn_indices=d.user_turn_indices,
+            policy=policy, seed=seed, llm=llm, judge=judge,
+        )
+        for rec in records:
+            payload = rec.to_dict()
+            errs = check_invariants(payload)
+            if errs:
+                inv_fail += 1
+                payload["_invariant_errors"] = errs
+            by_action[rec.gold.action] = by_action.get(rec.gold.action, 0) + 1
+            (accepted if rec.passes_confirm.status == "accepted" and not errs
+             else review).append(payload)
+
+    _write_jsonl(out_dir / "records.jsonl", accepted)
+    _write_jsonl(out_dir / "review_queue.jsonl", review)
+
+    stats = SeedStats(
+        total=len(accepted) + len(review),
+        accepted=len(accepted),
+        needs_review=sum(1 for r in review if r["passes"]["confirm"]["status"] == "needs_review"),
+        rejected=sum(1 for r in review if r["passes"]["confirm"]["status"] == "rejected"),
+        invariant_failures=inv_fail,
+        by_action=dict(sorted(by_action.items())),
+    )
+    manifest = {
+        "sgd_version": "GEM/schema_guided_dialog",
+        "num_dialogues": len(raw_dialogues),
+        "policy": policy,
+        "seed": seed,
+        "generator_model": getattr(llm, "model_id", "echo-stub"),
+        "judge_model": getattr(judge, "judge_model", "heuristic-judge"),
+        "stats": stats.__dict__,
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return stats
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row) + "\n")

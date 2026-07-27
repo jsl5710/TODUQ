@@ -1,0 +1,10 @@
+You are helping build an evaluation dataset for task-oriented dialogue.
+
+Rewrite the following user utterance into {{n}} natural, fluent variants that a
+real person might say. Preserve the EXACT meaning and every information slot —
+do not add, remove, or change any factual detail. Vary only wording and phrasing.
+
+Return one variant per line, no numbering, no commentary.
+
+Utterance:
+{{utterance}}

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Data — raw SGD is pulled by script, never committed; processed data is large
+data/raw/
+data/processed/
+*.arrow
+*.parquet
+
+# Secrets — NEVER commit tokens/keys. Use environment variables.
+.env
+*.key
+secrets.*
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

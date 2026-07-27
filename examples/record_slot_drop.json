@@ -1,0 +1,104 @@
+{
+  "record_id": "1_00000:2:slot_drop:42",
+  "dialogue_id": "1_00000",
+  "turn_idx": 2,
+  "services": ["Restaurants_1"],
+  "family": "perturbation",
+  "operator": "slot_drop",
+  "uncertainty_type": "input",
+  "uncertainty_source": "aleatoric",
+  "position": {
+    "user_turn_ordinal": 1,
+    "num_user_turns": 6,
+    "relative_position": 0.2,
+    "band": "early"
+  },
+  "source": {
+    "utterance": "I would like for it to be in San Jose.",
+    "belief_state": {
+      "Restaurants_1": {
+        "active_intent": "FindRestaurants",
+        "requested_slots": [],
+        "slot_values": { "city": "San Jose" }
+      }
+    }
+  },
+  "passes": {
+    "analyse": {
+      "modifiable": true,
+      "target_service": "Restaurants_1",
+      "target_slot": "city",
+      "target_intent": "FindRestaurants",
+      "candidate_operators": ["slot_drop", "referential_ambig"],
+      "rationale": "The turn fills the required slot city=San Jose. Removing it leaves FindRestaurants underspecified with no city, a canonical input-uncertainty site resolvable by a single clarification."
+    },
+    "document": {
+      "operator": "slot_drop",
+      "change_from": "I would like for it to be in San Jose.",
+      "change_to": "I would like to find somewhere to eat.",
+      "slot_delta": { "city": { "before": "San Jose", "after": null } },
+      "intended_uncertainty": "input",
+      "expected_severity": "minor",
+      "gold_action": "clarify",
+      "gold_clarification_question": "Which city should I search for restaurants in?",
+      "gold_query": null
+    },
+    "apply": {
+      "modified_utterance": "I would like to find somewhere to eat.",
+      "method": "template+llm_paraphrase",
+      "paraphrase_variants": [
+        "I'm pretty hungry — can you help me find a place to eat?",
+        "Looking to grab a bite somewhere, can you find me a restaurant?"
+      ],
+      "new_belief_state": {
+        "Restaurants_1": {
+          "active_intent": "FindRestaurants",
+          "requested_slots": [],
+          "slot_values": {}
+        }
+      }
+    },
+    "confirm": {
+      "change_applied": true,
+      "structural_checks": {
+        "target_slot_removed": true,
+        "belief_state_matches_spec": true
+      },
+      "judge_verdict": {
+        "fidelity": "pass",
+        "uncertainty_present": true,
+        "naturalness": 0.93
+      },
+      "status": "accepted",
+      "notes": "Slot city successfully dropped; intent preserved; clarification is the correct resolution."
+    },
+    "edit": {
+      "mode": "copy",
+      "final_utterance": "I would like to find somewhere to eat.",
+      "final_belief_state": {
+        "Restaurants_1": {
+          "active_intent": "FindRestaurants",
+          "requested_slots": [],
+          "slot_values": {}
+        }
+      },
+      "final_status": "finalized",
+      "changes": [],
+      "notes": "Confirmed clean; promoted the applied version as the canonical final."
+    }
+  },
+  "gold": {
+    "action": "clarify",
+    "severity": "minor",
+    "clarification_question": "Which city should I search for restaurants in?",
+    "query": null,
+    "should_abstain": true
+  },
+  "provenance": {
+    "sgd_version": "GEM/schema_guided_dialog",
+    "seed": 42,
+    "generator_model": "example-only",
+    "judge_model": "example-only",
+    "created_at": null
+  }
+}

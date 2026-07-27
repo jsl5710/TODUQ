@@ -1,30 +1,16 @@
-"""Uncertainty-quantification metrics for the simulator.
+"""Simulator UQ metrics — thin adapters over the shared `toduq.uq` layer.
 
-Each metric scores ONE user turn (given the bot + history) with an uncertainty
-value in [0, 1]. Metrics never see the injected-turn label — the simulator scores
-every turn and then checks whether the metric peaks at the injected turn.
-
-- LexicalUncertaintyMetric : input-based, offline. Scores the USER turn's surface
-  for hedges / underspecification / dangling referents. Catches INPUT-type
-  injections (slot_drop, referential_ambig, multi_value, underspecify) without a
-  model, and demonstrably fails on parameter/reasoning injections — which is the
-  point: UQ-metric coverage varies by uncertainty type.
-- SemanticEntropyMetric   : response-based. Samples the bot N times and computes
-  semantic entropy over the responses (needs a live model; identical samples ->
-  entropy 0, so EchoBot is degenerate here by design).
-- VerbalizedConfidenceMetric : asks the model its confidence; score = 1 - conf.
+The metric interface the simulator expects is `score(bot, turn, history) -> float`.
+Every metric here delegates to a UQ method loaded from the shared registry
+(`toduq.uq.load_uq`), so the SAME method implementations are used here and in
+TODUQ-MoA's gate. Pick any method with `load_metric(name)`.
 """
 from __future__ import annotations
 
-import re
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
-from toduq.eval.metrics import semantic_entropy
 from toduq.simulator.bot import Chatbot
-
-_HEDGE_WORDS = {"somewhere", "something", "anywhere", "someone", "somehow",
-                "maybe", "or", "whatever", "wherever"}
-_HEDGE_PHRASES = ("that one", "not sure", "over there", "or something", "or else")
+from toduq.uq import UQMethod, load_uq
 
 
 @runtime_checkable
@@ -33,41 +19,34 @@ class UQMetric(Protocol):
     def score(self, bot: Chatbot, turn: str, history: list[str]) -> float: ...
 
 
-class LexicalUncertaintyMetric:
-    """Offline, input-based. Fraction-weighted count of uncertainty markers in the
-    user turn, squashed to [0, 1]. Deterministic — good for reproducible demos."""
-    name = "lexical"
+class _MetricAdapter:
+    """Wraps a shared UQ method as a simulator metric (bot.llm is the client)."""
+    def __init__(self, method: UQMethod):
+        self._method = method
+        self.name = method.name
 
     def score(self, bot: Chatbot, turn: str, history: list[str]) -> float:
-        low = turn.lower()
-        words = set(re.findall(r"[a-z']+", low))
-        hits = len(words & _HEDGE_WORDS)
-        hits += sum(1 for p in _HEDGE_PHRASES if p in low)
-        return min(1.0, hits / 2.0)
+        client = getattr(bot, "llm", None)
+        return self._method.score(turn, context=history, client=client).score
 
 
-class SemanticEntropyMetric:
-    """Response-based. Semantic entropy over N bot samples (needs a live model)."""
-    name = "semantic_entropy"
-
-    def __init__(self, n: int = 5):
-        self.n = n
-
-    def score(self, bot: Chatbot, turn: str, history: list[str]) -> float:
-        samples = bot.sample(turn, history, self.n)
-        return semantic_entropy(samples)  # already normalized to [0, 1] when >1 cluster
+def load_metric(name: str, **kwargs) -> _MetricAdapter:
+    """Load any UQ metric of choice by name (see toduq.uq.available())."""
+    return _MetricAdapter(load_uq(name, **kwargs))
 
 
-class VerbalizedConfidenceMetric:
-    """Ask the model how confident it is; score = 1 - confidence (needs a model)."""
-    name = "verbalized_confidence"
+# --- Back-compat constructors (same names as before; now backed by the registry)
+def LexicalUncertaintyMetric() -> _MetricAdapter:
+    return load_metric("lexical")
 
-    _PROMPT = ("On a scale from 0.0 (no idea) to 1.0 (certain), how confident are you "
-               "that you can fully answer this user turn without more information? "
-               "Reply with only the number.\nUser: {turn}")
 
-    def score(self, bot: Chatbot, turn: str, history: list[str]) -> float:
-        raw = bot.llm.generate(self._PROMPT.format(turn=turn))
-        m = re.search(r"[0-1](?:\.\d+)?", raw)
-        conf = float(m.group()) if m else 0.5
-        return max(0.0, min(1.0, 1.0 - conf))
+def SemanticEntropyMetric(n: int = 5) -> _MetricAdapter:
+    return load_metric("semantic_entropy", n=n)
+
+
+def VerbalizedConfidenceMetric() -> _MetricAdapter:
+    return load_metric("verbalized_confidence")
+
+
+def SelfConsistencyMetric(n: int = 5) -> _MetricAdapter:
+    return load_metric("self_consistency", n=n)

@@ -132,7 +132,10 @@ See [`data/seed_v1/`](data/seed_v1/) for the generated seed set,
 [`docs/evaluation.md`](docs/evaluation.md) for the metrics, and
 [`docs/simulator.md`](docs/simulator.md) for the **TODUQ Simulator** (replays a
 sample turn-by-turn and tests whether a UQ metric flags uncertainty at the
-injected turn).
+injected turn). Pick the UQ method with `--metric`
+(`lexical | semantic_entropy | self_consistency | verbalized_confidence`) — these
+come from the **shared UQ layer** ([`docs/uq.md`](docs/uq.md)), one implementation
+loadable by name and used by both TODUQ and TODUQ-MoA.
 
 ## License & attribution
 

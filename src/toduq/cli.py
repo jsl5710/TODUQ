@@ -68,15 +68,15 @@ def _generate(use_live: bool) -> int:
     return 0
 
 
-def _simulate() -> int:
+def _simulate(metric_name: str = "lexical") -> int:
     from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS, SGD_1_00000_RAW, parse_dialogue
     from toduq.operators import all_operators
     from toduq.passes import run_dialogue
-    from toduq.simulator import Chatbot, LexicalUncertaintyMetric, simulate_record
+    from toduq.simulator import Chatbot, load_metric, simulate_record
 
     d = parse_dialogue(SGD_1_00000_RAW)
     bot = Chatbot()                       # offline EchoClient
-    metric = LexicalUncertaintyMetric()   # input-based, runs offline
+    metric = load_metric(metric_name)     # any method from the shared UQ registry
     # one record per operator (first occurrence) with its real dialogue position
     records = run_dialogue(dialogue_id=d.dialogue_id, user_turns=RESTAURANT_DIALOGUE_USER_TURNS,
                            operators=all_operators(), turn_indices=d.user_turn_indices,
@@ -111,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("demo", help="run the pass-chain on a fixture and print the record")
     sub.add_parser("dialogue", help="spread injections across a fixture dialogue")
-    sub.add_parser("simulate", help="replay a sample turn-by-turn; test if a UQ metric localizes the injection")
+    sim = sub.add_parser("simulate", help="replay a sample turn-by-turn; test if a UQ metric localizes the injection")
+    sim.add_argument("--metric", default="lexical",
+                     help="UQ method from the shared registry (lexical | semantic_entropy | self_consistency | verbalized_confidence)")
     gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
     gen.add_argument("--live", action="store_true",
                      help="use live generator+judge from configs/models.yaml (needs keys)")
@@ -123,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "dialogue":
         return _dialogue()
     if args.cmd == "simulate":
-        return _simulate()
+        return _simulate(args.metric)
     if args.cmd == "generate":
         return _generate(args.live)
     if args.cmd == "schema":

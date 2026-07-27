@@ -3,9 +3,11 @@ metric flags uncertainty at the injected turn."""
 from toduq.simulator.bot import Chatbot
 from toduq.simulator.metrics import (
     LexicalUncertaintyMetric,
+    SelfConsistencyMetric,
     SemanticEntropyMetric,
     UQMetric,
     VerbalizedConfidenceMetric,
+    load_metric,
 )
 from toduq.simulator.simulator import (
     SimResult,
@@ -15,7 +17,7 @@ from toduq.simulator.simulator import (
 )
 
 __all__ = [
-    "Chatbot", "UQMetric", "LexicalUncertaintyMetric", "SemanticEntropyMetric",
-    "VerbalizedConfidenceMetric", "SimResult", "TurnScore",
-    "simulate_record", "perturbed_user_turns",
+    "Chatbot", "UQMetric", "load_metric", "LexicalUncertaintyMetric",
+    "SemanticEntropyMetric", "SelfConsistencyMetric", "VerbalizedConfidenceMetric",
+    "SimResult", "TurnScore", "simulate_record", "perturbed_user_turns",
 ]

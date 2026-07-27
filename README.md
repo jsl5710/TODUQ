@@ -125,10 +125,14 @@ PYTHONPATH=src python -m toduq.cli dialogue    # one dialogue -> many samples
 PYTHONPATH=src python -m toduq.cli generate    # build data/seed_v1/ (heuristic gate)
 PYTHONPATH=src python -m toduq.cli generate --live   # LLM paraphrase + LLM judge
 PYTHONPATH=src python -m toduq.cli demo        # one full JSON record
+PYTHONPATH=src python -m toduq.cli simulate    # replay a sample; test UQ-metric localization
 ```
 
-See [`data/seed_v1/`](data/seed_v1/) for the generated seed set and
-[`docs/evaluation.md`](docs/evaluation.md) for the metrics.
+See [`data/seed_v1/`](data/seed_v1/) for the generated seed set,
+[`docs/evaluation.md`](docs/evaluation.md) for the metrics, and
+[`docs/simulator.md`](docs/simulator.md) for the **TODUQ Simulator** (replays a
+sample turn-by-turn and tests whether a UQ metric flags uncertainty at the
+injected turn).
 
 ## License & attribution
 

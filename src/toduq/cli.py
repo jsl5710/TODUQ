@@ -68,11 +68,50 @@ def _generate(use_live: bool) -> int:
     return 0
 
 
+def _simulate() -> int:
+    from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS, SGD_1_00000_RAW, parse_dialogue
+    from toduq.operators import all_operators
+    from toduq.passes import run_dialogue
+    from toduq.simulator import Chatbot, LexicalUncertaintyMetric, simulate_record
+
+    d = parse_dialogue(SGD_1_00000_RAW)
+    bot = Chatbot()                       # offline EchoClient
+    metric = LexicalUncertaintyMetric()   # input-based, runs offline
+    # one record per operator (first occurrence) with its real dialogue position
+    records = run_dialogue(dialogue_id=d.dialogue_id, user_turns=RESTAURANT_DIALOGUE_USER_TURNS,
+                           operators=all_operators(), turn_indices=d.user_turn_indices,
+                           policy="all", seed=1)
+    first: dict[str, object] = {}
+    for r in records:
+        first.setdefault(r.operator, r)
+
+    print(f"TODUQ Simulator — chatbot replay, UQ metric = {metric.name}\n")
+    hits = total = 0
+    for op_id in ("slot_drop", "underspecify", "multi_value", "referential_ambig",
+                  "out_of_kb_entity", "cross_turn_contra", "paraphrase"):
+        rec = first.get(op_id)
+        if rec is None:
+            continue
+        res = simulate_record(rec, RESTAURANT_DIALOGUE_USER_TURNS, bot, metric)
+        total += 1
+        hits += res.identified
+        peak = ", ".join(f"t{ts.ordinal}={ts.score}" for ts in res.turn_scores if ts.score > 0) or "(no spike)"
+        print(f"  {op_id:18} injected@t{res.injected_ordinal:<2} "
+              f"peak@t{res.predicted_ordinal} rank={res.rank_of_injected} "
+              f"identified={str(res.identified):5}  scores>0: {peak}")
+    print(f"\nlocalization: {hits}/{total}. The lexical metric catches lexicalized "
+          f"input uncertainty and the control; referential (coref) and parameter/"
+          f"reasoning types need response-based UQ (semantic entropy / verbalized "
+          f"confidence) with a live model — run with configs/models.yaml.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="toduq")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("demo", help="run the pass-chain on a fixture and print the record")
     sub.add_parser("dialogue", help="spread injections across a fixture dialogue")
+    sub.add_parser("simulate", help="replay a sample turn-by-turn; test if a UQ metric localizes the injection")
     gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
     gen.add_argument("--live", action="store_true",
                      help="use live generator+judge from configs/models.yaml (needs keys)")
@@ -83,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         return _demo()
     if args.cmd == "dialogue":
         return _dialogue()
+    if args.cmd == "simulate":
+        return _simulate()
     if args.cmd == "generate":
         return _generate(args.live)
     if args.cmd == "schema":

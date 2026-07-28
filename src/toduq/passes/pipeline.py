@@ -129,6 +129,7 @@ def run_dialogue(
     pool: Optional["object"] = None,
     workers: int = 0,
     judge: Optional[Judge | NullJudge] = None,
+    judge_pool: Optional["object"] = None,
     seed: int = 0,
     sgd_version: str = "GEM/schema_guided_dialog",
 ) -> list[Record]:
@@ -148,24 +149,27 @@ def run_dialogue(
     sites = enumerate_sites(user_turns, operators, turn_indices=turn_indices)
     chosen = select_sites(sites, policy=policy, k=k, seed=seed)
 
-    # Assign a model per site FIRST (sequential -> deterministic, even split),
-    # then optionally execute the sites concurrently across model endpoints.
-    assignments = [(pool.next() if pool is not None else llm) for _ in chosen]
+    # Assign a generator (and judge) per site FIRST — sequential, so the split is
+    # deterministic and even — then optionally execute the sites concurrently.
+    gen_assign = [(pool.next() if pool is not None else llm) for _ in chosen]
+    judge_assign = [(Judge(judge_pool.next()) if judge_pool is not None else judge)
+                    for _ in chosen]
 
-    def _run(site, client):
+    def _run(site, client, jud):
         return run_chain(
             dialogue_id=dialogue_id, turn_idx=site.turn_idx,
             turn=user_turns[site.ordinal], operator=site.operator,
-            position=site.position, llm=client, judge=judge, seed=seed,
+            position=site.position, llm=client, judge=jud, seed=seed,
             sgd_version=sgd_version,
         )
 
+    work = list(zip(chosen, gen_assign, judge_assign))
     if workers and workers > 1 and len(chosen) > 1:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            results = list(ex.map(lambda sc: _run(*sc), zip(chosen, assignments)))
+            results = list(ex.map(lambda w: _run(*w), work))
     else:
-        results = [_run(s, c) for s, c in zip(chosen, assignments)]
+        results = [_run(*w) for w in work]
     return [r for r in results if r is not None]
 
 

@@ -55,22 +55,31 @@ def _dialogue() -> int:
 
 def _generate(use_live: bool, workers: int = 0) -> int:
     from toduq.generate import generate_seed
-    llm = pool = judge = None
+    llm = pool = judge = judge_pool = None
     if use_live:
         from toduq.judge import Judge
-        from toduq.runners.factory import build_generator_pool, client_for_role
+        from toduq.runners.factory import (
+            build_generator_pool, build_judge_pool, client_for_role,
+        )
         pool = build_generator_pool()          # multi-model even split, if configured
         if pool is not None:
-            print(f"Generating with a {len(pool.clients)}-model pool "
+            print(f"Generators: {len(pool.clients)}-model pool "
                   f"(split={pool.strategy}): {', '.join(pool.labels)}")
         else:
             llm = client_for_role("generator")  # single generator
-        judge = Judge(client_for_role("judge"))
-    stats = generate_seed(llm=llm, pool=pool, workers=workers, judge=judge)
+        judge_pool = build_judge_pool()        # split the judge across models too
+        if judge_pool is not None:
+            print(f"Judges: {len(judge_pool.clients)}-model pool: {', '.join(judge_pool.labels)}")
+        else:
+            judge = Judge(client_for_role("judge"))
+    stats = generate_seed(llm=llm, pool=pool, workers=workers,
+                          judge=judge, judge_pool=judge_pool)
     print("Seed set written to data/seed_v1/")
     print(json.dumps(stats.__dict__, indent=2))
     if pool is not None:
-        print("Per-model split:", json.dumps(pool.summary()))
+        print("Generator split:", json.dumps(pool.summary()))
+    if judge_pool is not None:
+        print("Judge split:", json.dumps(judge_pool.summary()))
     return 0
 
 

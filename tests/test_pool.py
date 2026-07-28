@@ -62,6 +62,25 @@ def test_run_dialogue_splits_and_records_generator():
     assert counts[-1] - counts[0] <= 1
 
 
+def test_judge_pool_splits_and_records_judge_model():
+    from toduq.judge import Judge
+    d = parse_dialogue(SGD_1_00000_RAW)
+    # Judge wraps each client; a heuristic-like fake client returns valid JSON
+    class _JClient:
+        def __init__(self, mid): self.model_id = mid
+        def generate(self, p, *, system="", cfg=None):
+            return '{"fidelity":"pass","uncertainty_present":true,"naturalness":0.9}'
+        def sample(self, p, n, *, system="", cfg=None): return [self.generate(p)] * n
+    jpool = ModelPool([_JClient("judge-a"), _JClient("judge-b")])
+    recs = run_dialogue(dialogue_id=d.dialogue_id, user_turns=RESTAURANT_DIALOGUE_USER_TURNS,
+                        operators=all_operators(), turn_indices=d.user_turn_indices,
+                        policy="all", seed=1, pool=_pool(), judge_pool=jpool)
+    judges = {r.provenance.judge_model for r in recs}
+    assert judges == {"judge-a", "judge-b"}                 # both judges used
+    counts = sorted(jpool.summary().values())
+    assert counts[-1] - counts[0] <= 1                       # even split
+
+
 def test_parallel_matches_sequential():
     d = parse_dialogue(SGD_1_00000_RAW)
     kw = dict(dialogue_id=d.dialogue_id, user_turns=RESTAURANT_DIALOGUE_USER_TURNS,

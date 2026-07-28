@@ -35,7 +35,30 @@ generation:
   seed: 0
 ```
 
-## 3. Run
+## 3. Validate the config first (`--dry-run`)
+
+Before a big run, check every endpoint/key and preview the split — **no
+generation, no SDK or GPU needed** (uses only the stdlib):
+
+```bash
+PYTHONPATH=src python -m toduq.cli generate --dry-run
+```
+
+It `GET`s `/v1/models` on each `generators:`/`judges:` endpoint (marking each
+`OK`/`XX` with the reason), checks the env var for any closed API, and prints the
+planned per-model split over the real unit count. Exit code is `0` only when every
+check passes, so it drops straight into a CI/pre-flight gate. Example:
+
+```
+generators (3):
+  [OK ] Qwen/Qwen2.5-32B-Instruct       open   reachable, serving Qwen/Qwen2.5-32B-Instruct
+  [OK ] meta-llama/Llama-3.1-70B-Instr… open   reachable, serving meta-llama/Llama-3.1-70B-Instruct
+  [XX ] mistralai/Mistral-Small-…       open   UNREACHABLE at http://gpu2:8000/v1/models (...)
+Planned run: 104 units (38 violation + 66 control, control_multiplier=11) over 1 dialogue(s).
+  generator split: {"Qwen/...": 35, "meta-llama/...": 35, "mistralai/...": 34}
+```
+
+## 4. Run
 
 ```bash
 PYTHONPATH=src python -m toduq.cli generate --live --workers 8

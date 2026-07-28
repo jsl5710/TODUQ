@@ -151,6 +151,33 @@ def generate_seed(
     return stats
 
 
+def plan_run(raw_dialogues: Optional[list[dict[str, Any]]] = None, *,
+             policy: str = "all", seed: int = 42,
+             control_multiplier: Any = "auto") -> dict[str, Any]:
+    """Compute how many generation units the run will produce (and the control
+    multiplier) WITHOUT generating — for a dry-run split preview."""
+    from toduq import balancing
+    from toduq.positioning import enumerate_sites, select_sites
+
+    raw_dialogues = raw_dialogues or [SGD_1_00000_RAW]
+    ops = all_operators()
+    mult = (balancing.auto_control_multiplier(ops, lambda o: o.family == "paraphrase")
+            if control_multiplier == "auto" else int(control_multiplier))
+    units = control_units = 0
+    for raw in raw_dialogues:
+        d = parse_dialogue(raw)
+        sites = select_sites(enumerate_sites(d.user_turns, ops, turn_indices=d.user_turn_indices),
+                             policy=policy, seed=seed)
+        for s in sites:
+            if s.operator.family == "paraphrase":
+                control_units += mult
+            else:
+                units += 1
+    return {"num_dialogues": len(raw_dialogues), "control_multiplier": mult,
+            "violation_units": units, "control_units": control_units,
+            "total_units": units + control_units}
+
+
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as f:
         for row in rows:

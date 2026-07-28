@@ -1,0 +1,46 @@
+# JHU AI Gateway config. Copy to models.yaml. One bearer key (GATEWAY_KEY)
+# fronts many providers via an OpenAI-compatible endpoint; model ids are
+# provider-prefixed. NEVER commit the key — export GATEWAY_KEY in your shell.
+#
+#   export GATEWAY_KEY=...        # your JHU gateway key
+#   # optional: export GATEWAY_BASE=https://gateway.engineering.jhu.edu/gateway
+
+# Split generation evenly across the two models.
+generators:
+  - adapter: toduq.runners.gateway:GatewayClient
+    model_id: openai/gpt-4o-mini
+    api_key_env: GATEWAY_KEY
+  - adapter: toduq.runners.gateway:GatewayClient
+    model_id: anthropic/claude-haiku-4.5
+    api_key_env: GATEWAY_KEY
+generation:
+  split: round_robin        # exactly even across the two models
+  seed: 0
+  workers: 4
+
+# Split the judge evenly across the same two models (cross-checks each other).
+judges:
+  - adapter: toduq.runners.gateway:GatewayClient
+    model_id: openai/gpt-4o-mini
+    api_key_env: GATEWAY_KEY
+  - adapter: toduq.runners.gateway:GatewayClient
+    model_id: anthropic/claude-haiku-4.5
+    api_key_env: GATEWAY_KEY
+judging:
+  split: round_robin
+  seed: 0
+
+# Single-client roles (used if the pools above are removed).
+roles:
+  generator: gateway.gpt
+  judge: gateway.claude
+  system_under_test: gateway.gpt
+gateway:
+  gpt:
+    adapter: toduq.runners.gateway:GatewayClient
+    model_id: openai/gpt-4o-mini
+    api_key_env: GATEWAY_KEY
+  claude:
+    adapter: toduq.runners.gateway:GatewayClient
+    model_id: anthropic/claude-haiku-4.5
+    api_key_env: GATEWAY_KEY

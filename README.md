@@ -123,10 +123,13 @@ Try it offline (no API key needed):
 ```bash
 PYTHONPATH=src python -m toduq.cli dialogue    # one dialogue -> many samples
 PYTHONPATH=src python -m toduq.cli generate    # build data/seed_v1/ (heuristic gate)
-PYTHONPATH=src python -m toduq.cli generate --live   # LLM paraphrase + LLM judge
+PYTHONPATH=src python -m toduq.cli generate --live --workers 8   # multi-model, even split
 PYTHONPATH=src python -m toduq.cli demo        # one full JSON record
 PYTHONPATH=src python -m toduq.cli simulate    # replay a sample; test UQ-metric localization
 ```
+
+For a **server run**, split generation evenly across several open models
+(Qwen / Llama 3.1 / Mistral / …) — see [`docs/generation.md`](docs/generation.md).
 
 See [`data/seed_v1/`](data/seed_v1/) for the generated seed set,
 [`docs/evaluation.md`](docs/evaluation.md) for the metrics, and

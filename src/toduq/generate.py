@@ -40,17 +40,23 @@ def generate_seed(
     raw_dialogues: Optional[list[dict[str, Any]]] = None,
     *,
     llm: Optional[LLMClient] = None,
+    pool: Optional[Any] = None,
+    workers: int = 0,
     judge: Optional[Judge | NullJudge | HeuristicJudge] = None,
     policy: str = "all",
     seed: int = 42,
     out_dir: Path = _OUT,
 ) -> SeedStats:
+    """Build the seed set. Pass `pool` (a ModelPool) to split generation evenly
+    across several models — one shared pool across all dialogues keeps the split
+    even over the whole run, and each record records its generating model."""
     raw_dialogues = raw_dialogues or [SGD_1_00000_RAW]
     judge = judge or HeuristicJudge()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     accepted, review = [], []
     by_action: dict[str, int] = {}
+    by_generator: dict[str, int] = {}
     inv_fail = 0
 
     for raw in raw_dialogues:
@@ -58,7 +64,7 @@ def generate_seed(
         records = run_dialogue(
             dialogue_id=d.dialogue_id, user_turns=d.user_turns,
             operators=all_operators(), turn_indices=d.user_turn_indices,
-            policy=policy, seed=seed, llm=llm, judge=judge,
+            policy=policy, seed=seed, llm=llm, pool=pool, workers=workers, judge=judge,
         )
         for rec in records:
             payload = rec.to_dict()
@@ -67,6 +73,8 @@ def generate_seed(
                 inv_fail += 1
                 payload["_invariant_errors"] = errs
             by_action[rec.gold.action] = by_action.get(rec.gold.action, 0) + 1
+            gen = rec.provenance.generator_model or "echo-stub"
+            by_generator[gen] = by_generator.get(gen, 0) + 1
             (accepted if rec.passes_confirm.status == "accepted" and not errs
              else review).append(payload)
 
@@ -86,7 +94,9 @@ def generate_seed(
         "num_dialogues": len(raw_dialogues),
         "policy": policy,
         "seed": seed,
-        "generator_model": getattr(llm, "model_id", "echo-stub"),
+        "generator_model": getattr(pool, "model_id", None) or getattr(llm, "model_id", "echo-stub"),
+        "generators": pool.summary() if pool is not None else None,   # per-model split
+        "by_generator": dict(sorted(by_generator.items())),           # from record provenance
         "judge_model": getattr(judge, "judge_model", "heuristic-judge"),
         "stats": stats.__dict__,
     }

@@ -53,7 +53,8 @@ def _dialogue() -> int:
     return 0
 
 
-def _generate(use_live: bool, workers: int = 0) -> int:
+def _generate(use_live: bool, workers: int = 0, balance: bool = True,
+              balance_ratio: float = 1.0, control_multiplier: str = "auto") -> int:
     from toduq.generate import generate_seed
     llm = pool = judge = judge_pool = None
     if use_live:
@@ -72,10 +73,15 @@ def _generate(use_live: bool, workers: int = 0) -> int:
             print(f"Judges: {len(judge_pool.clients)}-model pool: {', '.join(judge_pool.labels)}")
         else:
             judge = Judge(client_for_role("judge"))
+    cm: object = "auto" if control_multiplier == "auto" else int(control_multiplier)
     stats = generate_seed(llm=llm, pool=pool, workers=workers,
-                          judge=judge, judge_pool=judge_pool)
-    print("Seed set written to data/seed_v1/")
+                          judge=judge, judge_pool=judge_pool, balance=balance,
+                          balance_ratio=balance_ratio, control_multiplier=cm)
+    print("Seed set written to data/seed_v1/ (records.jsonl = balanced, "
+          "records_all.jsonl = full)")
     print(json.dumps(stats.__dict__, indent=2))
+    print(f"Class balance: {stats.positive} positive (abstain/route) vs "
+          f"{stats.negative} negative (answer) -> {stats.balanced_total} balanced")
     if pool is not None:
         print("Generator split:", json.dumps(pool.summary()))
     if judge_pool is not None:
@@ -136,6 +142,13 @@ def main(argv: list[str] | None = None) -> int:
                      help="use live generator+judge from configs/models.yaml (needs keys)")
     gen.add_argument("--workers", type=int, default=0,
                      help="parallel generation across sites/models (0/1 = sequential)")
+    gen.add_argument("--no-balance", dest="balance", action="store_false",
+                     help="skip class balancing (keep the raw positive-skewed set)")
+    gen.add_argument("--balance-ratio", type=float, default=1.0,
+                     help="majority:minority cap after balancing (1.0 = exact 1:1)")
+    gen.add_argument("--control-multiplier", default="auto",
+                     help="control-paraphrase variants per turn to grow the negative "
+                          "class ('auto' sizes it from the operator mix)")
     sub.add_parser("schema", help="print the path to the annotation JSON Schema")
 
     args = parser.parse_args(argv)
@@ -146,7 +159,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "simulate":
         return _simulate(args.metric, args.mode)
     if args.cmd == "generate":
-        return _generate(args.live, args.workers)
+        return _generate(args.live, args.workers, args.balance,
+                         args.balance_ratio, args.control_multiplier)
     if args.cmd == "schema":
         from toduq.validate import _SCHEMA_PATH
         print(_SCHEMA_PATH)

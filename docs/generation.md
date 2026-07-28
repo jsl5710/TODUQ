@@ -70,6 +70,33 @@ Every record's `provenance.generator_model` names the model that generated it.
 so you can confirm the work was divided as intended and trace any sample back to
 its model.
 
+## Class balance (positive vs negative)
+
+Each turn gets many *uncertainty* samples but only one *control* (answer) sample,
+so the raw output is ~90 % positive (should-abstain). Generation balances it in
+two steps so `records.jsonl` ships **1:1** by default:
+
+1. **Grow the negative class** — `--control-multiplier` (default `auto`) emits N
+   distinct paraphrase variants per turn. `auto` sizes N from the operator mix
+   (11 uncertainty ops + 1 control → 11), so a live sampling model produces
+   several diverse `answer` samples per turn to match its uncertainty samples. No
+   positives are duplicated or discarded to grow negatives.
+2. **Exact trim** — `balance()` then undersamples whichever class is still the
+   majority down to `--balance-ratio × minority` (default `1.0` = exact 1:1),
+   deterministically (seeded). The dropped rows are cheap paraphrases, never
+   positives when positives are the minority.
+
+```bash
+PYTHONPATH=src python -m toduq.cli generate --live --workers 8            # 1:1 (default)
+PYTHONPATH=src python -m toduq.cli generate --balance-ratio 2            # 2:1 positive:negative
+PYTHONPATH=src python -m toduq.cli generate --no-balance                 # raw, skewed
+```
+
+Two files are written: **`records.jsonl`** (balanced — the shipped set) and
+**`records_all.jsonl`** (the full accepted set, nothing lost). The manifest's
+`class_balance` block reports `positive` / `negative` / `majority_class` /
+`dropped` / `balanced_total`, and `control_multiplier` records the N used.
+
 ## Library use
 
 ```python
@@ -79,5 +106,6 @@ from toduq.generate import generate_seed
 
 clients = [build_client(s) for s in generator_specs]
 pool = ModelPool(clients, strategy="round_robin")
-generate_seed(pool=pool, workers=8, judge=my_judge, raw_dialogues=dialogues)
+generate_seed(pool=pool, workers=8, judge=my_judge, raw_dialogues=dialogues,
+              balance=True, balance_ratio=1.0, control_multiplier="auto")
 ```

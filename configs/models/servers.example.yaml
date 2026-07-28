@@ -1,0 +1,33 @@
+# Multi-model generation config for a SERVER run. Copy to models.yaml.
+# Splits the generation (Pass-3 paraphrase) EVENLY across several open models,
+# each served on its own OpenAI-compatible endpoint (vLLM / Ollama / TGI).
+# NEVER commit keys — reference env vars only.
+
+generators:
+  - adapter: toduq.runners.open_source:VLLMClient
+    model_id: Qwen/Qwen2.5-32B-Instruct      # e.g. Qwen 3.5 when available
+    endpoint: http://gpu0:8000/v1
+  - adapter: toduq.runners.open_source:VLLMClient
+    model_id: meta-llama/Llama-3.1-70B-Instruct
+    endpoint: http://gpu1:8000/v1
+  - adapter: toduq.runners.open_source:VLLMClient
+    model_id: mistralai/Mistral-Small-Instruct-2409
+    endpoint: http://gpu2:8000/v1
+  - adapter: toduq.runners.open_source:OllamaClient
+    model_id: gemma2:27b                       # any other good model
+    endpoint: http://gpu3:11434/v1
+
+generation:
+  split: round_robin        # round_robin (exactly even) | random | weighted
+  # weights: [1, 1, 1, 1]   # weighted only: relative shares (e.g. faster GPUs get more)
+  seed: 0
+  workers: 4                # parallel generation across sites (0/1 = sequential)
+
+# Judge (Pass 4) stays a single model — swap for a strong verifier.
+roles:
+  judge: closed.claude
+closed:
+  claude:
+    adapter: toduq.runners.claude:ClaudeClient
+    model_id: claude-sonnet-5
+    api_key_env: ANTHROPIC_API_KEY

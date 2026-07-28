@@ -53,18 +53,24 @@ def _dialogue() -> int:
     return 0
 
 
-def _generate(use_live: bool) -> int:
+def _generate(use_live: bool, workers: int = 0) -> int:
     from toduq.generate import generate_seed
-    llm = judge = None
+    llm = pool = judge = None
     if use_live:
         from toduq.judge import Judge
-        from toduq.runners.factory import client_for_role
-        gen = client_for_role("generator")
-        llm = gen
+        from toduq.runners.factory import build_generator_pool, client_for_role
+        pool = build_generator_pool()          # multi-model even split, if configured
+        if pool is not None:
+            print(f"Generating with a {len(pool.clients)}-model pool "
+                  f"(split={pool.strategy}): {', '.join(pool.labels)}")
+        else:
+            llm = client_for_role("generator")  # single generator
         judge = Judge(client_for_role("judge"))
-    stats = generate_seed(llm=llm, judge=judge)
+    stats = generate_seed(llm=llm, pool=pool, workers=workers, judge=judge)
     print("Seed set written to data/seed_v1/")
     print(json.dumps(stats.__dict__, indent=2))
+    if pool is not None:
+        print("Per-model split:", json.dumps(pool.summary()))
     return 0
 
 
@@ -119,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
     gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
     gen.add_argument("--live", action="store_true",
                      help="use live generator+judge from configs/models.yaml (needs keys)")
+    gen.add_argument("--workers", type=int, default=0,
+                     help="parallel generation across sites/models (0/1 = sequential)")
     sub.add_parser("schema", help="print the path to the annotation JSON Schema")
 
     args = parser.parse_args(argv)
@@ -129,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "simulate":
         return _simulate(args.metric, args.mode)
     if args.cmd == "generate":
-        return _generate(args.live)
+        return _generate(args.live, args.workers)
     if args.cmd == "schema":
         from toduq.validate import _SCHEMA_PATH
         print(_SCHEMA_PATH)

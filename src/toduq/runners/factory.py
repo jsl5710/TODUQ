@@ -52,3 +52,31 @@ def client_for_role(role: str, config_path: Optional[Path] = None) -> LLMClient:
         return build_client(spec)
     except Exception:
         return EchoClient()
+
+
+def build_generator_pool(config_path: Optional[Path] = None):
+    """Build a ModelPool from the config's `generators` list (splits generation
+    evenly across models). Returns None if no `generators` are configured.
+
+    config:
+      generators:
+        - {adapter: ...open_source:VLLMClient, model_id: Qwen/..., endpoint: http://gpu0:8000/v1}
+        - {adapter: ...open_source:VLLMClient, model_id: meta-llama/Llama-3.1-8B-Instruct, endpoint: http://gpu1:8000/v1}
+        - {adapter: ...open_source:OllamaClient, model_id: mistral, endpoint: http://gpu2:11434/v1}
+      generation:
+        split: round_robin        # round_robin | random | weighted
+        weights: [1, 1, 1]        # weighted only
+        seed: 0
+    """
+    from toduq.runners.pool import ModelPool
+    path = config_path or _CONFIG
+    if not path.exists():
+        return None
+    cfg = _load_yaml(path)
+    specs = cfg.get("generators")
+    if not specs:
+        return None
+    clients = [build_client(s) for s in specs]
+    gen = cfg.get("generation", {}) or {}
+    return ModelPool(clients, strategy=gen.get("split", "round_robin"),
+                     weights=gen.get("weights"), seed=int(gen.get("seed", 0)))

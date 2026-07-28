@@ -6,5 +6,6 @@
     from toduq.runners.open_source import VLLMClient      # needs `vllm`/`transformers`
 """
 from toduq.runners.base import EchoClient, GenConfig, LLMClient
+from toduq.runners.pool import ModelPool
 
-__all__ = ["EchoClient", "GenConfig", "LLMClient"]
+__all__ = ["EchoClient", "GenConfig", "LLMClient", "ModelPool"]

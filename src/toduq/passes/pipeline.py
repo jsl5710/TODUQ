@@ -126,6 +126,8 @@ def run_dialogue(
     k: Optional[int] = None,
     turn_indices: Optional[list[int]] = None,
     llm: Optional[LLMClient] = None,
+    pool: Optional["object"] = None,
+    workers: int = 0,
     judge: Optional[Judge | NullJudge] = None,
     seed: int = 0,
     sgd_version: str = "GEM/schema_guided_dialog",
@@ -135,8 +137,10 @@ def run_dialogue(
 
     Enumerates every applicable (turn, operator) site, selects a positionally
     balanced subset (see toduq.positioning), and runs the 5-pass chain on each.
-    Returns one Record per selected site, so a single dialogue yields samples
-    spread across early / middle / late turns.
+
+    If `pool` (a ModelPool) is given, each site's paraphrase (Pass 3) is generated
+    by the next model in the pool — splitting the work evenly across models and
+    recording the assigned model in each record's provenance.
     """
     # Imported here to avoid a circular import (positioning imports schema only).
     from toduq.positioning import enumerate_sites, select_sites
@@ -144,22 +148,25 @@ def run_dialogue(
     sites = enumerate_sites(user_turns, operators, turn_indices=turn_indices)
     chosen = select_sites(sites, policy=policy, k=k, seed=seed)
 
-    records: list[Record] = []
-    for site in chosen:
-        rec = run_chain(
-            dialogue_id=dialogue_id,
-            turn_idx=site.turn_idx,
-            turn=user_turns[site.ordinal],
-            operator=site.operator,
-            position=site.position,
-            llm=llm,
-            judge=judge,
-            seed=seed,
+    # Assign a model per site FIRST (sequential -> deterministic, even split),
+    # then optionally execute the sites concurrently across model endpoints.
+    assignments = [(pool.next() if pool is not None else llm) for _ in chosen]
+
+    def _run(site, client):
+        return run_chain(
+            dialogue_id=dialogue_id, turn_idx=site.turn_idx,
+            turn=user_turns[site.ordinal], operator=site.operator,
+            position=site.position, llm=client, judge=judge, seed=seed,
             sgd_version=sgd_version,
         )
-        if rec is not None:
-            records.append(rec)
-    return records
+
+    if workers and workers > 1 and len(chosen) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            results = list(ex.map(lambda sc: _run(*sc), zip(chosen, assignments)))
+    else:
+        results = [_run(s, c) for s, c in zip(chosen, assignments)]
+    return [r for r in results if r is not None]
 
 
 def _edit(turn: Turn, document, apply, confirm) -> EditPass:

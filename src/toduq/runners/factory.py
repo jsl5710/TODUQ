@@ -80,3 +80,21 @@ def build_generator_pool(config_path: Optional[Path] = None):
     gen = cfg.get("generation", {}) or {}
     return ModelPool(clients, strategy=gen.get("split", "round_robin"),
                      weights=gen.get("weights"), seed=int(gen.get("seed", 0)))
+
+
+def build_judge_pool(config_path: Optional[Path] = None):
+    """Build a ModelPool of judge CLIENTS from the config's `judges:` list, so the
+    Pass-4 validation is split evenly across judge models. Returns None if none
+    configured. (run_dialogue wraps each client in a Judge per site.)"""
+    from toduq.runners.pool import ModelPool
+    path = config_path or _CONFIG
+    if not path.exists():
+        return None
+    cfg = _load_yaml(path)
+    specs = cfg.get("judges")
+    if not specs:
+        return None
+    clients = [build_client(s) for s in specs]
+    j = cfg.get("judging", {}) or cfg.get("generation", {}) or {}
+    return ModelPool(clients, strategy=j.get("split", "round_robin"),
+                     weights=j.get("weights"), seed=int(j.get("seed", 0)))

@@ -43,6 +43,7 @@ def generate_seed(
     pool: Optional[Any] = None,
     workers: int = 0,
     judge: Optional[Judge | NullJudge | HeuristicJudge] = None,
+    judge_pool: Optional[Any] = None,
     policy: str = "all",
     seed: int = 42,
     out_dir: Path = _OUT,
@@ -57,6 +58,7 @@ def generate_seed(
     accepted, review = [], []
     by_action: dict[str, int] = {}
     by_generator: dict[str, int] = {}
+    by_judge: dict[str, int] = {}
     inv_fail = 0
 
     for raw in raw_dialogues:
@@ -64,7 +66,8 @@ def generate_seed(
         records = run_dialogue(
             dialogue_id=d.dialogue_id, user_turns=d.user_turns,
             operators=all_operators(), turn_indices=d.user_turn_indices,
-            policy=policy, seed=seed, llm=llm, pool=pool, workers=workers, judge=judge,
+            policy=policy, seed=seed, llm=llm, pool=pool, workers=workers,
+            judge=judge, judge_pool=judge_pool,
         )
         for rec in records:
             payload = rec.to_dict()
@@ -75,6 +78,8 @@ def generate_seed(
             by_action[rec.gold.action] = by_action.get(rec.gold.action, 0) + 1
             gen = rec.provenance.generator_model or "echo-stub"
             by_generator[gen] = by_generator.get(gen, 0) + 1
+            jm = rec.provenance.judge_model or "null-judge"
+            by_judge[jm] = by_judge.get(jm, 0) + 1
             (accepted if rec.passes_confirm.status == "accepted" and not errs
              else review).append(payload)
 
@@ -97,7 +102,9 @@ def generate_seed(
         "generator_model": getattr(pool, "model_id", None) or getattr(llm, "model_id", "echo-stub"),
         "generators": pool.summary() if pool is not None else None,   # per-model split
         "by_generator": dict(sorted(by_generator.items())),           # from record provenance
-        "judge_model": getattr(judge, "judge_model", "heuristic-judge"),
+        "judge_model": getattr(judge_pool, "model_id", None) or getattr(judge, "judge_model", "heuristic-judge"),
+        "judges": judge_pool.summary() if judge_pool is not None else None,  # per-judge split
+        "by_judge": dict(sorted(by_judge.items())),                   # from record provenance
         "stats": stats.__dict__,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

@@ -23,7 +23,20 @@ generation:
   seed: 0
   workers: 4                # parallel generation across sites (0/1 = sequential)
 
-# Judge (Pass 4) stays a single model — swap for a strong verifier.
+# Judge (Pass 4): either a single model (roles.judge) OR split across several
+# judges too (judges: list) — same even-split mechanism as generators.
+judges:
+  - adapter: toduq.runners.open_source:VLLMClient
+    model_id: Qwen/Qwen2.5-72B-Instruct
+    endpoint: http://gpu4:8000/v1
+  - adapter: toduq.runners.claude:ClaudeClient
+    model_id: claude-sonnet-5
+    api_key_env: ANTHROPIC_API_KEY
+judging:
+  split: round_robin        # round_robin | random | weighted (defaults to generation.split)
+  seed: 0
+
+# Fallback single judge if `judges:` is omitted.
 roles:
   judge: closed.claude
 closed:

@@ -4,20 +4,42 @@
   "policy": "all",
   "seed": 42,
   "generator_model": "echo-stub",
+  "generators": null,
+  "by_generator": {
+    "echo-stub": 104
+  },
   "judge_model": "heuristic-judge",
+  "judges": null,
+  "by_judge": {
+    "heuristic-judge": 104
+  },
+  "control_multiplier": 11,
+  "class_balance": {
+    "positive": 38,
+    "negative": 66,
+    "target_ratio": 1.0,
+    "majority_class": "negative",
+    "dropped": 28,
+    "kept_positive": 38,
+    "kept_negative": 38,
+    "balanced_total": 76
+  },
   "stats": {
-    "total": 44,
-    "accepted": 44,
+    "total": 104,
+    "accepted": 104,
     "needs_review": 0,
     "rejected": 0,
     "invariant_failures": 0,
     "by_action": {
-      "answer": 6,
+      "answer": 66,
       "clarify": 8,
       "handoff_llm": 10,
       "hitl": 6,
       "rag_structured": 8,
       "rag_unstructured": 6
-    }
+    },
+    "positive": 38,
+    "negative": 66,
+    "balanced_total": 76
   }
 }

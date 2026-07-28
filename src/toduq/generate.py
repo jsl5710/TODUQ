@@ -34,6 +34,14 @@ class SeedStats:
     rejected: int
     invariant_failures: int
     by_action: dict[str, int]
+    positive: int = 0          # should_abstain == True (abstain/route)
+    negative: int = 0          # should_abstain == False (answer / control)
+    balanced_total: int = 0    # size of the balanced records.jsonl
+
+
+def _is_positive(payload: dict[str, Any]) -> bool:
+    """Positive class = the model should abstain / route (not just answer)."""
+    return bool(payload["gold"]["should_abstain"])
 
 
 def generate_seed(
@@ -46,14 +54,30 @@ def generate_seed(
     judge_pool: Optional[Any] = None,
     policy: str = "all",
     seed: int = 42,
+    balance: bool = True,
+    balance_ratio: float = 1.0,
+    control_multiplier: Any = "auto",
+    balance_seed: int = 0,
     out_dir: Path = _OUT,
 ) -> SeedStats:
     """Build the seed set. Pass `pool` (a ModelPool) to split generation evenly
     across several models — one shared pool across all dialogues keeps the split
-    even over the whole run, and each record records its generating model."""
+    even over the whole run, and each record records its generating model.
+
+    Class balance: `control_multiplier` (int or "auto") grows the negative
+    (answer) class by emitting that many control-paraphrase variants per turn;
+    "auto" sizes it from the operator mix. When `balance` is set, the *accepted*
+    records are then trimmed to `balance_ratio` (1.0 = exact 1:1) and written to
+    records.jsonl, while the full accepted set is kept in records_all.jsonl."""
+    from toduq import balancing
+
     raw_dialogues = raw_dialogues or [SGD_1_00000_RAW]
     judge = judge or HeuristicJudge()
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    ops = all_operators()
+    mult = (balancing.auto_control_multiplier(ops, lambda o: o.family == "paraphrase")
+            if control_multiplier == "auto" else int(control_multiplier))
 
     accepted, review = [], []
     by_action: dict[str, int] = {}
@@ -67,7 +91,7 @@ def generate_seed(
             dialogue_id=d.dialogue_id, user_turns=d.user_turns,
             operators=all_operators(), turn_indices=d.user_turn_indices,
             policy=policy, seed=seed, llm=llm, pool=pool, workers=workers,
-            judge=judge, judge_pool=judge_pool,
+            judge=judge, judge_pool=judge_pool, control_multiplier=mult,
         )
         for rec in records:
             payload = rec.to_dict()
@@ -83,7 +107,19 @@ def generate_seed(
             (accepted if rec.passes_confirm.status == "accepted" and not errs
              else review).append(payload)
 
-    _write_jsonl(out_dir / "records.jsonl", accepted)
+    # Class-balance the accepted set (positive = should_abstain).
+    if balance:
+        balanced, _dropped, report = balancing.balance(
+            accepted, is_positive=_is_positive, ratio=balance_ratio, seed=balance_seed)
+    else:
+        balanced = accepted
+        report = {"positive": sum(_is_positive(r) for r in accepted),
+                  "negative": sum(not _is_positive(r) for r in accepted),
+                  "target_ratio": None, "majority_class": None, "dropped": 0,
+                  "balanced_total": len(accepted)}
+
+    _write_jsonl(out_dir / "records.jsonl", balanced)          # balanced, shipped
+    _write_jsonl(out_dir / "records_all.jsonl", accepted)      # full, unbalanced
     _write_jsonl(out_dir / "review_queue.jsonl", review)
 
     stats = SeedStats(
@@ -93,6 +129,8 @@ def generate_seed(
         rejected=sum(1 for r in review if r["passes"]["confirm"]["status"] == "rejected"),
         invariant_failures=inv_fail,
         by_action=dict(sorted(by_action.items())),
+        positive=report["positive"], negative=report["negative"],
+        balanced_total=report["balanced_total"],
     )
     manifest = {
         "sgd_version": "GEM/schema_guided_dialog",
@@ -105,6 +143,8 @@ def generate_seed(
         "judge_model": getattr(judge_pool, "model_id", None) or getattr(judge, "judge_model", "heuristic-judge"),
         "judges": judge_pool.summary() if judge_pool is not None else None,  # per-judge split
         "by_judge": dict(sorted(by_judge.items())),                   # from record provenance
+        "control_multiplier": mult,
+        "class_balance": report,                                      # positive vs negative
         "stats": stats.__dict__,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

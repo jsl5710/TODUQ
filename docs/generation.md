@@ -6,6 +6,27 @@ OpenAI-compatible endpoint (vLLM / Ollama / TGI). Work is divided by a
 `ModelPool`, each sample records the model that produced it, and sites can run in
 parallel across endpoints.
 
+## Option B — JHU AI Gateway (no self-hosting)
+
+If you have a JHU gateway key, skip steps 1–2: the gateway fronts many providers
+through one OpenAI-compatible endpoint, so you point the pool straight at it.
+
+```bash
+export GATEWAY_KEY=...            # your JHU gateway key (never commit it)
+cp configs/models/gateway.example.yaml configs/models/models.yaml
+PYTHONPATH=src python -m toduq.cli generate --dry-run          # expect all OK
+PYTHONPATH=src python -m toduq.cli generate --live --workers 4
+```
+
+The shipped `gateway.example.yaml` splits both generation and judging evenly
+across **`openai/gpt-4o-mini`** and **`anthropic/claude-haiku-4.5`**. The adapter
+(`toduq.runners.gateway:GatewayClient`) posts to
+`{base}/compat/chat/completions` with a bearer `GATEWAY_KEY` and uses
+`max_completion_tokens` (the gateway's field). Override the host with
+`GATEWAY_BASE`; add `send_temperature: false` to a spec for reasoning models that
+reject `temperature`. The rest of this doc (self-hosted vLLM/Ollama) is the
+alternative when you serve your own weights.
+
 ## 1. Serve the models
 
 Each model on its own endpoint, e.g. with vLLM:

@@ -29,6 +29,11 @@ def build_client(spec: dict[str, Any]) -> LLMClient:
     if adapter.endswith("openai:OpenAIClient"):
         from toduq.runners.openai import OpenAIClient
         return OpenAIClient(model_id or "gpt-4o")
+    if adapter.endswith("gateway:GatewayClient"):
+        from toduq.runners.gateway import GatewayClient
+        return GatewayClient(model_id, base=spec.get("base"),
+                             api_key_env=spec.get("api_key_env", "GATEWAY_KEY"),
+                             send_temperature=spec.get("send_temperature", True))
     if "open_source" in adapter:
         from toduq.runners.open_source import OllamaClient, VLLMClient
         endpoint = spec.get("endpoint", "http://localhost:8000/v1")
@@ -132,8 +137,29 @@ def _role_spec(cfg: dict[str, Any], role: str) -> Optional[dict[str, Any]]:
         return None
 
 
+def _ping_gateway(base: str, key_env: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Cheap gateway reachability probe — GET {base}/compat/models with the bearer
+    key. Any HTTP response (even 404) means the host is up + the key is present;
+    only a network error is a failure. Spends no completion tokens."""
+    import os
+    import urllib.error
+    import urllib.request
+    key = os.environ.get(key_env)
+    if not key:
+        return False, f"env {key_env} NOT set"
+    url = base.rstrip("/") + "/compat/models"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout):  # noqa: S310 (trusted config URL)
+            return True, f"reachable ({key_env} set, {url} responded)"
+    except urllib.error.HTTPError as e:  # up, but /models not exposed or auth quirk
+        return True, f"reachable ({key_env} set, HTTP {e.code} at {url})"
+    except Exception as e:  # pragma: no cover - network-dependent
+        return False, f"UNREACHABLE at {url} ({e.__class__.__name__}: {e})"
+
+
 def check_spec(spec: dict[str, Any]) -> dict[str, Any]:
-    """Validate one client spec: ping open endpoints, check keys for closed APIs."""
+    """Validate one client spec: ping open/gateway endpoints, check keys for closed APIs."""
     import os
     adapter = spec.get("adapter", "")
     model_id = spec.get("model_id", "")
@@ -141,6 +167,12 @@ def check_spec(spec: dict[str, Any]) -> dict[str, Any]:
         endpoint = spec.get("endpoint", "")
         ok, detail = _ping_openai_endpoint(endpoint, model_id) if endpoint else (False, "no endpoint set")
         return {"model_id": model_id, "kind": "open", "target": endpoint, "ok": ok, "detail": detail}
+    if adapter.endswith("gateway:GatewayClient"):
+        key_env = spec.get("api_key_env", "GATEWAY_KEY")
+        base = spec.get("base") or os.environ.get("GATEWAY_BASE") \
+            or "https://gateway.engineering.jhu.edu/gateway"
+        ok, detail = _ping_gateway(base, key_env)
+        return {"model_id": model_id, "kind": "gateway", "target": base, "ok": ok, "detail": detail}
     env = spec.get("api_key_env", "")
     ok = bool(env and os.environ.get(env))
     detail = f"env {env} is set" if ok else f"env {env or '<none>'} NOT set"

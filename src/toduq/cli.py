@@ -89,6 +89,45 @@ def _generate(use_live: bool, workers: int = 0, balance: bool = True,
     return 0
 
 
+def _dry_run(control_multiplier: str = "auto") -> int:
+    """Validate the model config and print the planned split — no generation."""
+    from toduq.generate import plan_run
+    from toduq.runners.factory import check_config, planned_split
+
+    report = check_config()
+    print(f"Config: {report['config']}")
+    if not report.get("exists"):
+        print("  (no models.yaml — a live run would fall back to the offline EchoClient)")
+        return 0
+
+    all_ok = True
+    for role in ("generators", "judges"):
+        checks = report[role]
+        print(f"\n{role} ({len(checks)}):")
+        if not checks:
+            print("  (none configured)")
+        for c in checks:
+            mark = "OK " if c["ok"] else "XX "
+            all_ok = all_ok and c["ok"]
+            print(f"  [{mark}] {c['model_id']:<40} {c['kind']:<6} {c['detail']}")
+
+    cm: object = "auto" if control_multiplier == "auto" else int(control_multiplier)
+    plan = plan_run(control_multiplier=cm)
+    units = plan["total_units"]
+    gsplit = planned_split(units, "generators", "generation")
+    jsplit = planned_split(units, "judges", "judging")
+    print(f"\nPlanned run: {units} generation units "
+          f"({plan['violation_units']} violation + {plan['control_units']} control, "
+          f"control_multiplier={plan['control_multiplier']}) over "
+          f"{plan['num_dialogues']} dialogue(s).")
+    if gsplit is not None:
+        print("  generator split:", json.dumps(gsplit))
+    if jsplit is not None:
+        print("  judge split:    ", json.dumps(jsplit))
+    print(f"\n{'All endpoints/keys OK — ready to run.' if all_ok else 'Some checks FAILED — fix the marked entries before --live.'}")
+    return 0 if all_ok else 1
+
+
 def _simulate(metric_name: str = "lexical", mode: str = "history") -> int:
     from toduq.ingest import RESTAURANT_DIALOGUE_USER_TURNS, SGD_1_00000_RAW, parse_dialogue
     from toduq.operators import all_operators
@@ -140,6 +179,9 @@ def main(argv: list[str] | None = None) -> int:
     gen = sub.add_parser("generate", help="build the curated seed set into data/seed_v1/")
     gen.add_argument("--live", action="store_true",
                      help="use live generator+judge from configs/models.yaml (needs keys)")
+    gen.add_argument("--dry-run", action="store_true",
+                     help="validate configured endpoints/keys and print the planned "
+                          "split — no generation")
     gen.add_argument("--workers", type=int, default=0,
                      help="parallel generation across sites/models (0/1 = sequential)")
     gen.add_argument("--no-balance", dest="balance", action="store_false",
@@ -159,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "simulate":
         return _simulate(args.metric, args.mode)
     if args.cmd == "generate":
+        if args.dry_run:
+            return _dry_run(args.control_multiplier)
         return _generate(args.live, args.workers, args.balance,
                          args.balance_ratio, args.control_multiplier)
     if args.cmd == "schema":
